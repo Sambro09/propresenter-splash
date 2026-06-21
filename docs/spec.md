@@ -1,7 +1,7 @@
 # ProPresenter Workspace Launcher — Specification
 
 > Working title: **ProPresenter Workspace Launcher** (repo: `propresenter-splash`)
-> Status: Draft v0.1 — 2026-06-18
+> Status: Draft v0.1 — Phase 0 completed 2026-06-21; Phase 1 next
 > Platform: macOS · Electron · Target app: **ProPresenter 21+**
 
 ---
@@ -65,32 +65,32 @@ sit down at the machine.
 
 ## 5. Background: how ProPresenter 21 stores workspaces
 
-Findings from research (sources in §16). **All of this must be re-verified on a real PP 21
-machine during the Phase 0 spike (§11) — the active-workspace mechanism is undocumented.**
+Findings from research (sources in §16) plus local Phase 0 validation on ProPresenter 21.4.
+The active-workspace mechanism is undocumented, so future ProPresenter releases should still be
+checked with a version/schema self-check.
 
 - **Workspaces directory (macOS):**
-  `~/Library/Application Support/RenewedVision/ProPresenter/User Workspaces`
+  `~/Library/Application Support/RenewedVision/ProPresenter/UserWorkspaces`
   (Default *content* such as libraries/media may also live under `~/Documents/ProPresenter`;
   some installs use a custom/relocated support-files path shown in Settings → General.)
-- **App preferences:** `~/Library/Preferences/com.renewedvision.ProPresenter.plist`
-- **Bundle identifier:** `com.renewedvision.ProPresenter`
+- **App preferences:** `~/Library/Preferences/com.renewedvision.propresenter.plist`
+- **Bundle identifier:** `com.renewedvision.propresenter`
 - **In-app switching:** Settings → General → **Active Workspace** dropdown → **Manage Workspaces**.
   Switching the active workspace requires ProPresenter to **restart**.
 - **No documented CLI flag or URL scheme** exists to boot ProPresenter into a chosen
   workspace.
 
 ### The core technical bet
-Because there is no public "open workspace X" command, the only realistic way to launch into
-a specific workspace is to **set the value ProPresenter reads at startup to decide which
-workspace is active, then launch the app.** That "active workspace" value lives in one of:
+Because there is no public "open workspace X" command, the launcher will boot a specific
+workspace by **setting the values ProPresenter reads at startup to decide which workspace is
+active, then launching the app.** Phase 0 confirmed this preference-backed mechanism for
+ProPresenter 21.4:
 
-- **(A)** a key inside `com.renewedvision.ProPresenter.plist`
-  (e.g. something like `activeWorkspaceId` / `currentWorkspacePath` — exact key TBD), or
-- **(B)** a pointer/manifest file inside the `…/RenewedVision/ProPresenter/` support directory
-  (e.g. a JSON listing workspaces and which one is active).
+- `applicationShowDirectory` stores the selected workspace path.
+- `userWorkspaces` stores `NSData` containing a JSON workspace registry; exactly one object
+  should have `isActive: true`.
 
-**Identifying (A) vs (B) and the exact key/field is the single highest-risk unknown and is
-the explicit goal of the Phase 0 discovery spike.**
+See `docs/phase0-findings.md` for the validated command sequence and evidence.
 
 ---
 
@@ -239,19 +239,19 @@ poll until terminated (timeout ~10s) → activeWorkspace.write(id) → controlle
 
 ## 11. Phased plan & milestones
 
-### Phase 0 — Discovery spike *(gating; do first, on a real PP 21 machine)*
-Goal: nail down the undocumented mechanics. Deliverable: a short findings doc + a proven
-read/write of the active-workspace value.
-- Inventory `…/RenewedVision/ProPresenter/User Workspaces` — folder layout, naming, any
-  per-workspace manifest/metadata, and how display names map to folders.
-- Snapshot `com.renewedvision.ProPresenter.plist` (`defaults export` / `plutil -p`) **and** the
-  support directory; switch the active workspace in-app; snapshot again; **diff** to locate the
-  active-workspace key/pointer (approach A vs B).
-- Verify PP **reads** the value at launch (set it externally with PP closed → launch → confirm)
-  and whether PP **overwrites** it on quit.
-- Sanity-check stability across a 21.x patch to gauge version fragility.
+### Phase 0 — Discovery spike *(completed 2026-06-21)*
+Goal: nail down the undocumented mechanics. Deliverable complete:
+`docs/phase0-findings.md`.
+- Inventoried `…/RenewedVision/ProPresenter/UserWorkspaces` and confirmed workspace names map
+  to local workspace folders.
+- Confirmed ProPresenter 21.4 uses preference domain `com.renewedvision.propresenter`.
+- Confirmed external switching requires writing both `applicationShowDirectory` and
+  `userWorkspaces`.
+- Verified ProPresenter **reads** the externally written value at launch and does not revert it
+  on quit.
+- Restored the test machine to its original active workspace after validation.
 
-### Phase 1 — MVP launcher (PP-closed path)
+### Phase 1 — MVP launcher (PP-closed path) *(next)*
 Scan → list → show active (FR1, FR2) → set active + launch when PP is closed (FR3, FR6, FR7).
 
 ### Phase 2 — Running-PP handling
