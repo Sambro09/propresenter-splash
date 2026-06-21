@@ -47,6 +47,7 @@
         "zip"
       ],
       "minimumSystemVersion": "13.0",
+      "identity": "Developer ID Application",
       "hardenedRuntime": true,
       "entitlements": "build/entitlements.mac.plist",
       "entitlementsInherit": "build/entitlements.mac.inherit.plist",

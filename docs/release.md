@@ -5,7 +5,8 @@ Use this checklist for the signed internal release described in `docs/spec.md`.
 ## Prerequisites
 
 - Apple Developer Program membership.
-- Developer ID Application certificate installed in the release keychain.
+- Developer ID Application certificate installed in the release keychain. Apple Development
+  certificates are not valid for Developer ID notarization.
 - Notarization credentials supplied through one of electron-builder's supported environment
   variable sets:
   - `APPLE_API_KEY`, `APPLE_API_KEY_ID`, `APPLE_API_ISSUER`
