@@ -61,6 +61,11 @@ Connect `.p8` key file; the workflow writes it to a temporary file and exposes t
 
 The workflow validates the certificate subject before building. If it does not contain
 `Developer ID Application`, replace `MACOS_CERTIFICATE_BASE64` with the correct `.p12`.
+You can verify a local export before updating the secret:
+
+```sh
+P12_PASSWORD=<export-password> npm run release:check-cert -- DeveloperIDApplication.p12
+```
 
 The workflow uses the built-in `GITHUB_TOKEN` as `GH_TOKEN` for electron-builder publishing.
 

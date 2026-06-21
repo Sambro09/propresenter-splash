@@ -17,6 +17,7 @@
     "package": "npm run build && electron-builder --mac --dir",
     "dist": "npm run build && electron-builder --mac",
     "release": "npm run build && electron-builder --mac --publish always",
+    "release:check-cert": "node scripts/validate-developer-id-certificate.mjs",
     "typecheck": "tsc --noEmit"
   },
   "build": {
