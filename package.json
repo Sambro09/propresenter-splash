@@ -3,16 +3,66 @@
   "version": "0.1.0",
   "private": true,
   "description": "macOS launcher for choosing a ProPresenter workspace before opening ProPresenter.",
+  "author": "ProPresenter Workspace Launcher Contributors",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Sambro09/propresenter-splash.git"
+  },
   "main": "./out/main/index.js",
   "type": "module",
   "scripts": {
     "dev": "electron-vite dev",
     "build": "npm run typecheck && electron-vite build",
     "preview": "electron-vite preview",
+    "package": "npm run build && electron-builder --mac --dir",
+    "dist": "npm run build && electron-builder --mac",
+    "release": "npm run build && electron-builder --mac --publish always",
+    "release:check-cert": "node scripts/validate-developer-id-certificate.mjs",
     "typecheck": "tsc --noEmit"
+  },
+  "build": {
+    "appId": "com.propresenterworkspace.launcher",
+    "productName": "ProPresenter Workspace Launcher",
+    "directories": {
+      "buildResources": "build",
+      "output": "dist"
+    },
+    "files": [
+      "out/**/*",
+      "package.json"
+    ],
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "Sambro09",
+        "repo": "propresenter-splash",
+        "releaseType": "release"
+      }
+    ],
+    "artifactName": "ProPresenter-Workspace-Launcher-${version}-${arch}.${ext}",
+    "asar": true,
+    "mac": {
+      "category": "public.app-category.utilities",
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "minimumSystemVersion": "13.0",
+      "identity": "Developer ID Application",
+      "hardenedRuntime": true,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.inherit.plist",
+      "notarize": true,
+      "extendInfo": {
+        "NSAppleEventsUsageDescription": "ProPresenter Workspace Launcher uses Apple Events to quit or focus ProPresenter when switching workspaces.",
+        "NSSupportsAutomaticGraphicsSwitching": true
+      }
+    },
+    "dmg": {}
   },
   "dependencies": {
     "@electron-toolkit/utils": "^4.0.0",
+    "electron-updater": "^6.8.9",
     "lucide-react": "^0.469.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
@@ -24,6 +74,7 @@
     "@types/react-dom": "^18.3.5",
     "@vitejs/plugin-react": "^5.2.0",
     "electron": "^42.4.1",
+    "electron-builder": "^26.15.3",
     "electron-vite": "^5.0.0",
     "typescript": "^5.7.2",
     "vite": "^7.3.5"

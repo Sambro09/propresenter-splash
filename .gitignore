@@ -3,3 +3,7 @@ out/
 dist/
 .DS_Store
 *.log
+*.p12
+*.cer
+*.certSigningRequest
+AuthKey_*.p8

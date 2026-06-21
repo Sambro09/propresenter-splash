@@ -1,10 +1,13 @@
-import { app, BrowserWindow, ipcMain } from 'electron';
+import { app, BrowserWindow, clipboard, ipcMain, shell as electronShell } from 'electron';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { writeFile } from 'node:fs/promises';
 import { electronApp, optimizer } from '@electron-toolkit/utils';
-import type { LaunchResult } from '../shared/types';
-import { getLauncherState, launchWorkspace } from './launcherService';
+import type { LaunchResult, LaunchWorkspaceOptions } from '../shared/types';
+import { initializeDiagnostics } from './diagnostics';
+import { PROPRESENTER_DOWNLOAD_URL } from './proPresenterConstants';
+import { chooseWorkspacesFolder, getLauncherState, launchWorkspace } from './launcherService';
+import { initializeAutoUpdates } from './updates';
 
 const currentDir = dirname(fileURLToPath(import.meta.url));
 
@@ -43,6 +46,7 @@ function createWindow(): void {
 function runSmokeHooks(window: BrowserWindow): void {
   const capturePath = process.env.LAUNCHER_SMOKE_CAPTURE;
   const shouldLogText = process.env.LAUNCHER_SMOKE_TEXT === '1';
+  const delayMs = Number(process.env.LAUNCHER_SMOKE_DELAY_MS ?? 1_500);
 
   if (!capturePath && !shouldLogText) {
     return;
@@ -62,11 +66,12 @@ function runSmokeHooks(window: BrowserWindow): void {
     if (process.env.LAUNCHER_SMOKE_QUIT === '1') {
       app.quit();
     }
-  }, 1_500);
+  }, Number.isFinite(delayMs) ? delayMs : 1_500);
 }
 
 app.whenReady().then(() => {
-  electronApp.setAppUserModelId('com.local.propresenter-workspace-launcher');
+  electronApp.setAppUserModelId('com.propresenterworkspace.launcher');
+  initializeDiagnostics();
 
   app.on('browser-window-created', (_, window) => {
     optimizer.watchWindowShortcuts(window);
@@ -74,17 +79,33 @@ app.whenReady().then(() => {
 
   ipcMain.handle('launcher:get-state', () => getLauncherState());
 
-  ipcMain.handle('launcher:launch-workspace', async (event, workspaceId: string) => {
-    const result: LaunchResult = await launchWorkspace(workspaceId);
-    if (result.ok) {
-      const window = BrowserWindow.fromWebContents(event.sender);
-      setTimeout(() => window?.close(), 700);
-    }
+  ipcMain.handle('launcher:choose-workspaces-folder', (event) =>
+    chooseWorkspacesFolder(BrowserWindow.fromWebContents(event.sender) ?? undefined)
+  );
 
-    return result;
+  ipcMain.handle('launcher:copy-support-details', (_event, details: string) => {
+    clipboard.writeText(details);
   });
 
+  ipcMain.handle('launcher:open-propresenter-download', () =>
+    electronShell.openExternal(PROPRESENTER_DOWNLOAD_URL)
+  );
+
+  ipcMain.handle(
+    'launcher:launch-workspace',
+    async (event, workspaceId: string, options?: LaunchWorkspaceOptions) => {
+      const result: LaunchResult = await launchWorkspace(workspaceId, options);
+      if (result.ok) {
+        const window = BrowserWindow.fromWebContents(event.sender);
+        setTimeout(() => window?.close(), 700);
+      }
+
+      return result;
+    }
+  );
+
   createWindow();
+  initializeAutoUpdates();
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {

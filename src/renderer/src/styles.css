@@ -99,6 +99,11 @@ button {
   font-size: 13px;
 }
 
+.statusStrip span {
+  min-width: 0;
+  flex: 1;
+}
+
 .statusStrip.warning {
   border-color: #f1cfc3;
   color: #92400e;
@@ -107,7 +112,7 @@ button {
 
 .notice {
   display: grid;
-  grid-template-columns: 18px minmax(0, 1fr);
+  grid-template-columns: 18px minmax(0, 1fr) auto auto;
   gap: 9px;
   align-items: start;
   margin: 0 24px 12px;
@@ -118,6 +123,57 @@ button {
   background: #fff7f3;
   font-size: 13px;
   line-height: 1.35;
+}
+
+.notice.success {
+  border-color: #b8dcca;
+  color: #14583f;
+  background: #f0fbf5;
+}
+
+.notice span {
+  overflow-wrap: anywhere;
+}
+
+.inlineButton,
+.footerButton,
+.primaryButton,
+.secondaryButton,
+.dangerButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 30px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0;
+  cursor: pointer;
+  -webkit-app-region: no-drag;
+}
+
+.inlineButton {
+  padding: 4px 8px;
+  border: 1px solid currentColor;
+  color: inherit;
+  background: rgba(255, 255, 255, 0.55);
+}
+
+.inlineButton:hover:not(:disabled),
+.footerButton:hover:not(:disabled),
+.primaryButton:hover:not(:disabled),
+.secondaryButton:hover:not(:disabled) {
+  background: #ffffff;
+}
+
+.inlineButton:disabled,
+.footerButton:disabled,
+.primaryButton:disabled,
+.secondaryButton:disabled,
+.dangerButton:disabled {
+  cursor: default;
+  opacity: 0.65;
 }
 
 .workspacePanel {
@@ -252,6 +308,14 @@ button {
   line-height: 1.4;
 }
 
+.primaryButton {
+  margin-top: 8px;
+  padding: 7px 12px;
+  border: 1px solid #8ba8c4;
+  color: #183653;
+  background: #f8fbff;
+}
+
 .details {
   margin: 4px 0 0;
   padding: 10px 12px;
@@ -261,6 +325,19 @@ button {
   background: #fff8f1;
   font-size: 12px;
   line-height: 1.4;
+}
+
+.detailsHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.detailsHeader strong {
+  color: #603616;
+  font-size: 12px;
 }
 
 .details p {
@@ -273,7 +350,7 @@ button {
 
 .footer {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto auto;
   gap: 12px;
   align-items: center;
   min-height: 44px;
@@ -289,9 +366,77 @@ button {
   white-space: nowrap;
 }
 
+.footerButton {
+  min-height: 28px;
+  padding: 4px 9px;
+  border: 1px solid #d3dae5;
+  color: #43546a;
+  background: #f8fafc;
+}
+
 .footer strong {
   color: #526175;
   font-weight: 700;
+}
+
+.modalBackdrop {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(15, 23, 42, 0.32);
+}
+
+.modal {
+  width: min(100%, 390px);
+  padding: 20px;
+  border: 1px solid #d4dce8;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 18px 50px rgba(15, 23, 42, 0.2);
+}
+
+.modal h2 {
+  margin: 0;
+  color: #172033;
+  font-size: 18px;
+  letter-spacing: 0;
+}
+
+.modal p {
+  margin: 10px 0 18px;
+  color: #536276;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.modalActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.secondaryButton,
+.dangerButton {
+  min-width: 92px;
+  padding: 7px 12px;
+}
+
+.secondaryButton {
+  border: 1px solid #d3dae5;
+  color: #34445a;
+  background: #f8fafc;
+}
+
+.dangerButton {
+  border: 1px solid #be5b4d;
+  color: #ffffff;
+  background: #b94738;
+}
+
+.dangerButton:hover:not(:disabled) {
+  background: #a53c2f;
 }
 
 .spin {
