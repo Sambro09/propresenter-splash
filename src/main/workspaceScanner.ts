@@ -1,7 +1,8 @@
 import { readdir, stat } from 'node:fs/promises';
 import { basename, join } from 'node:path';
 import type { Workspace } from '../shared/types';
-import { DEFAULT_WORKSPACE_ROOT } from './proPresenterConstants';
+import { getWorkspaceRootConfig } from './config';
+import { logError } from './logger';
 import {
   readActiveWorkspaceState,
   registryEntryPath,
@@ -11,6 +12,7 @@ import { normalizeFilePath, samePath } from './pathUtils';
 
 export interface WorkspaceScanResult {
   workspaceRoot: string;
+  isCustomWorkspaceRoot: boolean;
   activeWorkspaceId?: string;
   activeWorkspaceName?: string;
   workspaces: Workspace[];
@@ -23,12 +25,13 @@ function registryName(entry: WorkspaceRegistryEntry | undefined, fallbackPath: s
 
 export async function scanWorkspaces(): Promise<WorkspaceScanResult> {
   const errors: string[] = [];
-  const workspaceRoot = DEFAULT_WORKSPACE_ROOT;
+  const { workspaceRoot, isCustomWorkspaceRoot } = await getWorkspaceRootConfig();
   const directories = new Set<string>();
 
   let activeState = await readActiveWorkspaceState().catch((error: unknown) => {
     const message = error instanceof Error ? error.message : String(error);
     errors.push(`Could not read ProPresenter workspace preferences: ${message}`);
+    void logError('Could not read ProPresenter workspace preferences', error);
     return {
       registry: [],
       activePath: undefined,
@@ -47,6 +50,7 @@ export async function scanWorkspaces(): Promise<WorkspaceScanResult> {
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     errors.push(`Could not read workspace folder: ${message}`);
+    void logError('Could not read workspace folder', { workspaceRoot, error });
   }
 
   for (const entry of activeState.registry) {
@@ -98,6 +102,7 @@ export async function scanWorkspaces(): Promise<WorkspaceScanResult> {
 
   return {
     workspaceRoot,
+    isCustomWorkspaceRoot,
     activeWorkspaceId,
     activeWorkspaceName,
     workspaces,
