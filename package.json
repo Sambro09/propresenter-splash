@@ -1,0 +1,41 @@
+{
+  "name": "propresenter-workspace-launcher",
+  "version": "0.1.0",
+  "private": true,
+  "description": "macOS launcher for choosing a ProPresenter workspace before opening ProPresenter.",
+  "main": "./out/main/index.js",
+  "type": "module",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "npm run typecheck && electron-vite build",
+    "preview": "electron-vite preview",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@electron-toolkit/utils": "^4.0.0",
+    "lucide-react": "^0.469.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@swc/core": "^1.15.3",
+    "@types/node": "^22.10.2",
+    "@types/react": "^18.3.18",
+    "@types/react-dom": "^18.3.5",
+    "@vitejs/plugin-react": "^5.2.0",
+    "electron": "^42.4.1",
+    "electron-vite": "^5.0.0",
+    "typescript": "^5.7.2",
+    "vite": "^7.3.5"
+  },
+  "overrides": {
+    "vite": {
+      "esbuild": "^0.28.1"
+    }
+  },
+  "allowScripts": {
+    "esbuild@0.25.12": true,
+    "esbuild@0.28.1": true,
+    "@swc/core@1.15.41": true
+  }
+}
