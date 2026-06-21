@@ -3,10 +3,22 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { writeFile } from 'node:fs/promises';
 import { electronApp, optimizer } from '@electron-toolkit/utils';
-import type { LaunchResult, LaunchWorkspaceOptions } from '../shared/types';
+import type {
+  LaunchResult,
+  LaunchWorkspaceOptions,
+  WorkspaceOverridePatch
+} from '../shared/types';
 import { initializeDiagnostics } from './diagnostics';
 import { PROPRESENTER_DOWNLOAD_URL } from './proPresenterConstants';
-import { chooseWorkspacesFolder, getLauncherState, launchWorkspace } from './launcherService';
+import {
+  chooseDirectory,
+  chooseWorkspacesFolder,
+  getLauncherState,
+  launchWorkspace,
+  resetWorkspaceOverride,
+  updateWorkspaceOverride
+} from './launcherService';
+import { createApplicationMenu, setEditMode } from './appMenu';
 import { initializeAutoUpdates } from './updates';
 
 const currentDir = dirname(fileURLToPath(import.meta.url));
@@ -20,6 +32,7 @@ function createWindow(): void {
     show: false,
     title: 'ProPresenter Workspace Launcher',
     titleBarStyle: 'hiddenInset',
+    backgroundColor: '#1b1b1d',
     webPreferences: {
       preload: join(currentDir, '../preload/index.mjs'),
       contextIsolation: true,
@@ -52,6 +65,21 @@ function runSmokeHooks(window: BrowserWindow): void {
     return;
   }
 
+  const baseDelay = Number.isFinite(delayMs) ? delayMs : 1_500;
+
+  if (process.env.LAUNCHER_SMOKE_EDIT === '1') {
+    setTimeout(() => setEditMode(true, { notifyRenderer: true }), Math.min(baseDelay / 2, 1_200));
+  }
+
+  const clickSelector = process.env.LAUNCHER_SMOKE_CLICK;
+  if (clickSelector) {
+    setTimeout(() => {
+      void window.webContents.executeJavaScript(
+        `document.querySelector(${JSON.stringify(clickSelector)})?.click();`
+      );
+    }, Math.min(baseDelay * 0.75, 1_800));
+  }
+
   setTimeout(async () => {
     if (shouldLogText) {
       const text = await window.webContents.executeJavaScript('document.body.innerText');
@@ -72,6 +100,7 @@ function runSmokeHooks(window: BrowserWindow): void {
 app.whenReady().then(() => {
   electronApp.setAppUserModelId('com.propresenterworkspace.launcher');
   initializeDiagnostics();
+  createApplicationMenu();
 
   app.on('browser-window-created', (_, window) => {
     optimizer.watchWindowShortcuts(window);
@@ -89,6 +118,23 @@ app.whenReady().then(() => {
 
   ipcMain.handle('launcher:open-propresenter-download', () =>
     electronShell.openExternal(PROPRESENTER_DOWNLOAD_URL)
+  );
+
+  ipcMain.handle(
+    'launcher:update-workspace',
+    (_event, key: string, patch: WorkspaceOverridePatch) => updateWorkspaceOverride(key, patch)
+  );
+
+  ipcMain.handle('launcher:reset-workspace', (_event, key: string) =>
+    resetWorkspaceOverride(key)
+  );
+
+  ipcMain.handle('launcher:choose-directory', (event) =>
+    chooseDirectory(BrowserWindow.fromWebContents(event.sender) ?? undefined)
+  );
+
+  ipcMain.handle('launcher:set-edit-mode', (_event, value: boolean) =>
+    setEditMode(Boolean(value), { notifyRenderer: false })
   );
 
   ipcMain.handle(

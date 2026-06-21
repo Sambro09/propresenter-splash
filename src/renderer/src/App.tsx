@@ -1,17 +1,25 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  AlertCircle,
-  CheckCircle2,
+  CaretRight,
+  CheckCircle,
+  CircleNotch,
   Clipboard,
-  Circle,
-  Download,
-  ExternalLink,
+  DownloadSimple,
   FolderOpen,
-  Loader2,
-  MonitorUp,
-  RefreshCw
-} from 'lucide-react';
-import type { LauncherState, LaunchWorkspaceOptions, Workspace } from '../../shared/types';
+  Gear,
+  IconContext,
+  MonitorPlay,
+  PencilSimple,
+  Stack,
+  Warning,
+  WarningCircle
+} from '@phosphor-icons/react';
+import type {
+  LauncherState,
+  LaunchWorkspaceOptions,
+  Workspace,
+  WorkspaceOverridePatch
+} from '../../shared/types';
 
 type LoadStatus = 'loading' | 'ready' | 'error';
 type LaunchingState = {
@@ -19,10 +27,15 @@ type LaunchingState = {
   label: string;
 };
 
+// Phosphor regular weight everywhere, matching ProPresenter's line-weight UI chrome.
+const ICON_DEFAULTS = { weight: 'regular' as const, size: 18 };
+
 function App(): JSX.Element {
   const [launcherState, setLauncherState] = useState<LauncherState | null>(null);
   const [loadStatus, setLoadStatus] = useState<LoadStatus>('loading');
   const [refreshing, setRefreshing] = useState(false);
+  const [editMode, setEditMode] = useState(false);
+  const [editingWorkspace, setEditingWorkspace] = useState<Workspace | null>(null);
   const [launching, setLaunching] = useState<LaunchingState | null>(null);
   const [confirmingWorkspace, setConfirmingWorkspace] = useState<Workspace | null>(null);
   const [retryWorkspace, setRetryWorkspace] = useState<Workspace | null>(null);
@@ -48,19 +61,6 @@ function App(): JSX.Element {
   useEffect(() => {
     void loadState();
   }, [loadState]);
-
-  const activeLabel = useMemo(() => {
-    if (!launcherState?.activeWorkspaceName) {
-      return 'None selected';
-    }
-
-    return launcherState.activeWorkspaceName;
-  }, [launcherState]);
-
-  const supportDetails = useMemo(
-    () => buildSupportDetails(launcherState, message),
-    [launcherState, message]
-  );
 
   async function handleRefresh(): Promise<void> {
     setRefreshing(true);
@@ -98,6 +98,30 @@ function App(): JSX.Element {
     }
   }
 
+  // Keep menu-bar actions pointed at the latest handlers without re-subscribing.
+  const menuHandlers = useRef({ rescan: handleRefresh, chooseFolder: handleChooseFolder });
+  menuHandlers.current = { rescan: handleRefresh, chooseFolder: handleChooseFolder };
+
+  useEffect(() => {
+    const offMenu = window.launcher.onMenuAction((action) => {
+      if (action === 'rescan') {
+        void menuHandlers.current.rescan();
+      } else if (action === 'choose-folder') {
+        void menuHandlers.current.chooseFolder();
+      }
+    });
+    const offEdit = window.launcher.onEditMode((value) => setEditMode(value));
+    return () => {
+      offMenu();
+      offEdit();
+    };
+  }, []);
+
+  const supportDetails = useMemo(
+    () => buildSupportDetails(launcherState, message),
+    [launcherState, message]
+  );
+
   async function handleCopyDetails(): Promise<void> {
     try {
       await window.launcher.copySupportDetails(supportDetails);
@@ -113,6 +137,41 @@ function App(): JSX.Element {
     await window.launcher.openProPresenterDownload();
   }
 
+  async function handleExitEditMode(): Promise<void> {
+    const value = await window.launcher.setEditMode(false);
+    setEditMode(value);
+    setEditingWorkspace(null);
+  }
+
+  async function handleSaveWorkspace(
+    workspace: Workspace,
+    patch: WorkspaceOverridePatch
+  ): Promise<void> {
+    setMessage(null);
+    setCopyStatus(null);
+    try {
+      const nextState = await window.launcher.updateWorkspace(workspace.key, patch);
+      setLauncherState(nextState);
+      setEditingWorkspace(null);
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      setMessage(`Could not save workspace changes. ${detail}`);
+    }
+  }
+
+  async function handleResetWorkspace(workspace: Workspace): Promise<void> {
+    setMessage(null);
+    setCopyStatus(null);
+    try {
+      const nextState = await window.launcher.resetWorkspace(workspace.key);
+      setLauncherState(nextState);
+      setEditingWorkspace(null);
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      setMessage(`Could not reset workspace. ${detail}`);
+    }
+  }
+
   async function handleLaunch(
     workspace: Workspace,
     options: LaunchWorkspaceOptions = {}
@@ -122,8 +181,8 @@ function App(): JSX.Element {
       workspaceId: workspace.id,
       label:
         options.confirmQuit && proPresenterIsRunning
-          ? 'Quitting ProPresenter...'
-          : `Opening "${workspace.name}"...`
+          ? 'Quitting ProPresenter…'
+          : `Opening “${workspace.name}”…`
     });
     setMessage(null);
     setCopyStatus(null);
@@ -164,205 +223,360 @@ function App(): JSX.Element {
   }
 
   return (
-    <main className="shell">
-      <header className="header">
-        <div className="titleBlock">
-          <h1>Choose a Workspace</h1>
-          <p>Current: {activeLabel}</p>
-        </div>
-        <button
-          className="iconButton"
-          type="button"
-          title="Rescan"
-          aria-label="Rescan"
-          onClick={handleRefresh}
-          disabled={refreshing || loadStatus === 'loading'}
-        >
-          <RefreshCw className={refreshing ? 'spin' : undefined} size={19} />
-        </button>
-      </header>
+    <IconContext.Provider value={ICON_DEFAULTS}>
+      <div className="app">
+        <header className="toolbar">
+          <div className="toolbarTitle">
+            <span className="toolbarGlyph" aria-hidden="true">
+              <Stack size={19} />
+            </span>
+            <span className="toolbarText">
+              <span className="toolbarHeading">Workspaces</span>
+              <span className="toolbarSub">
+                Current: <b>{launcherState?.activeWorkspaceName ?? 'None selected'}</b>
+              </span>
+            </span>
+          </div>
+          <ProPresenterStatus state={launcherState} />
+        </header>
 
-      <StatusStrip state={launcherState} onDownload={handleOpenDownload} />
-
-      {message ? (
-        <div className="notice" role="alert">
-          <AlertCircle size={18} />
-          <span>{message}</span>
-          {retryWorkspace ? (
-            <button
-              className="inlineButton"
-              type="button"
-              onClick={() => void handleLaunch(retryWorkspace, { confirmQuit: true })}
-            >
-              <RefreshCw size={15} />
-              Retry
+        {editMode ? (
+          <div className="editBar">
+            <span className="editBarLabel">
+              <PencilSimple size={15} weight="fill" />
+              Edit Mode
+            </span>
+            <span className="editBarHint">Rename or repoint workspaces</span>
+            <button className="editBarDone" type="button" onClick={() => void handleExitEditMode()}>
+              Done
             </button>
+          </div>
+        ) : null}
+
+        <div className="alerts">
+          {launcherState && !launcherState.proPresenter.installed ? (
+            <div className="banner warn" role="status">
+              <WarningCircle size={18} weight="fill" />
+              <span>ProPresenter isn’t installed on this Mac.</span>
+              <button className="bannerBtn" type="button" onClick={() => void handleOpenDownload()}>
+                <DownloadSimple size={15} />
+                Download
+              </button>
+            </div>
           ) : null}
-          <button className="inlineButton" type="button" onClick={handleCopyDetails}>
-            <Clipboard size={15} />
-            Copy details
-          </button>
-        </div>
-      ) : null}
 
-      {copyStatus ? (
-        <div className="notice success" role="status">
-          <CheckCircle2 size={18} />
-          <span>{copyStatus}</span>
-        </div>
-      ) : null}
+          {message ? (
+            <div className="banner error" role="alert">
+              <WarningCircle size={18} weight="fill" />
+              <span>{message}</span>
+              {retryWorkspace ? (
+                <button
+                  className="bannerBtn"
+                  type="button"
+                  onClick={() => void handleLaunch(retryWorkspace, { confirmQuit: true })}
+                >
+                  Retry
+                </button>
+              ) : null}
+              <button className="bannerBtn" type="button" onClick={handleCopyDetails}>
+                <Clipboard size={15} />
+                Copy details
+              </button>
+            </div>
+          ) : null}
 
-      <section className="workspacePanel" aria-live="polite">
-        {loadStatus === 'loading' ? <LoadingState /> : null}
-        {loadStatus === 'error' ? <ErrorState /> : null}
-        {loadStatus === 'ready' && launcherState ? (
-          <WorkspaceList
-            launcherState={launcherState}
-            launching={launching}
-            onLaunch={handleLaunch}
-            onChooseFolder={handleChooseFolder}
-            onCopyDetails={handleCopyDetails}
+          {copyStatus ? (
+            <div className="banner success" role="status">
+              <CheckCircle size={18} weight="fill" />
+              <span>{copyStatus}</span>
+            </div>
+          ) : null}
+        </div>
+
+        <main className="library" aria-live="polite">
+          {loadStatus === 'loading' ? <LoadingState /> : null}
+          {loadStatus === 'error' ? <ErrorState /> : null}
+          {loadStatus === 'ready' && launcherState ? (
+            <WorkspaceLibrary
+              launcherState={launcherState}
+              launching={launching}
+              editMode={editMode}
+              onLaunch={handleLaunch}
+              onEdit={setEditingWorkspace}
+              onChooseFolder={handleChooseFolder}
+              onCopyDetails={handleCopyDetails}
+            />
+          ) : null}
+        </main>
+
+        {confirmingWorkspace ? (
+          <ConfirmDialog
+            workspace={confirmingWorkspace}
+            busy={launching?.workspaceId === confirmingWorkspace.id}
+            onCancel={() => setConfirmingWorkspace(null)}
+            onConfirm={handleConfirmSwitch}
           />
         ) : null}
-      </section>
 
-      <footer className="footer">
-        <span>{launcherState?.workspaceRoot ?? ''}</span>
-        <button
-          className="footerButton"
-          type="button"
-          onClick={handleChooseFolder}
-          disabled={refreshing}
-        >
-          <FolderOpen size={14} />
-          Choose folder
-        </button>
-        <strong>v0.1.0</strong>
-      </footer>
-
-      {confirmingWorkspace ? (
-        <ConfirmDialog
-          workspace={confirmingWorkspace}
-          busy={launching?.workspaceId === confirmingWorkspace.id}
-          onCancel={() => setConfirmingWorkspace(null)}
-          onConfirm={handleConfirmSwitch}
-        />
-      ) : null}
-    </main>
+        {editingWorkspace ? (
+          <WorkspaceEditor
+            workspace={editingWorkspace}
+            onCancel={() => setEditingWorkspace(null)}
+            onSave={handleSaveWorkspace}
+            onReset={handleResetWorkspace}
+          />
+        ) : null}
+      </div>
+    </IconContext.Provider>
   );
 }
 
-function StatusStrip({
-  state,
-  onDownload
-}: {
-  state: LauncherState | null;
-  onDownload: () => Promise<void>;
-}): JSX.Element {
-  if (!state) {
-    return (
-      <div className="statusStrip">
-        <Loader2 className="spin" size={16} />
-        <span>Scanning</span>
-      </div>
-    );
-  }
+function ProPresenterStatus({ state }: { state: LauncherState | null }): JSX.Element {
+  let dotClass = 'statusDot';
+  let label = 'Checking…';
+  let title = 'Checking ProPresenter…';
 
-  if (!state.proPresenter.installed) {
-    return (
-      <div className="statusStrip warning">
-        <AlertCircle size={16} />
-        <span>ProPresenter not found</span>
-        <button className="inlineButton" type="button" onClick={() => void onDownload()}>
-          <Download size={15} />
-          Download
-        </button>
-      </div>
-    );
+  if (state) {
+    if (!state.proPresenter.installed) {
+      dotClass = 'statusDot missing';
+      label = 'Not installed';
+      title = 'ProPresenter is not installed';
+    } else if (state.proPresenter.running) {
+      dotClass = 'statusDot live';
+      label = 'Open';
+      title = 'ProPresenter is open';
+    } else {
+      dotClass = 'statusDot off';
+      label = 'Closed';
+      title = 'ProPresenter is closed';
+    }
   }
 
   return (
-    <div className="statusStrip">
-      <MonitorUp size={16} />
-      <span>{state.proPresenter.running ? 'ProPresenter is open' : 'ProPresenter is closed'}</span>
-    </div>
+    <span className="ppStatus" title={title}>
+      <span className={dotClass} aria-hidden="true" />
+      {label}
+    </span>
   );
 }
 
-function WorkspaceList({
+function WorkspaceLibrary({
   launcherState,
   launching,
+  editMode,
   onLaunch,
+  onEdit,
   onChooseFolder,
   onCopyDetails
 }: {
   launcherState: LauncherState;
   launching: LaunchingState | null;
+  editMode: boolean;
   onLaunch: (workspace: Workspace) => Promise<void>;
+  onEdit: (workspace: Workspace) => void;
   onChooseFolder: () => Promise<void>;
   onCopyDetails: () => Promise<void>;
 }): JSX.Element {
   if (launcherState.workspaces.length === 0) {
     return (
-      <div className="emptyState">
-        <AlertCircle size={24} />
+      <div className="placeholder">
+        <span className="placeholderGlyph" aria-hidden="true">
+          <Stack size={26} />
+        </span>
         <h2>No workspaces found</h2>
         <p>{launcherState.workspaceRoot}</p>
-        <button className="primaryButton" type="button" onClick={() => void onChooseFolder()}>
+        <button className="primaryBtn" type="button" onClick={() => void onChooseFolder()}>
           <FolderOpen size={17} />
-          Choose folder
+          Choose Folder
         </button>
       </div>
     );
   }
 
-  return (
-    <div className="workspaceList">
-      {launcherState.workspaces.map((workspace) => {
-        const isLaunching = launching?.workspaceId === workspace.id;
-        return (
-          <button
-            type="button"
-            className={`workspaceRow${workspace.isActive ? ' active' : ''}`}
-            key={workspace.id}
-            onClick={() => void onLaunch(workspace)}
-            disabled={Boolean(launching) || !launcherState.proPresenter.installed}
-          >
-            <span className="workspaceIcon" aria-hidden="true">
-              {isLaunching ? (
-                <Loader2 className="spin" size={22} />
-              ) : workspace.isActive ? (
-                <CheckCircle2 size={22} />
-              ) : (
-                <Circle size={22} />
-              )}
-            </span>
-            <span className="workspaceText">
-              <span className="workspaceName">{workspace.name}</span>
-              <span className="workspacePath">
-                {isLaunching ? launching.label : workspace.path}
-              </span>
-            </span>
-            {workspace.isActive ? <span className="badge">Active</span> : null}
-            {!workspace.isActive ? <ExternalLink className="launchIcon" size={18} /> : null}
-          </button>
-        );
-      })}
+  const disabled = Boolean(launching) || !launcherState.proPresenter.installed;
 
-      {launcherState.errors.length > 0 ? (
-        <div className="details">
-          <div className="detailsHeader">
-            <strong>Details</strong>
-            <button className="inlineButton" type="button" onClick={() => void onCopyDetails()}>
-              <Clipboard size={15} />
-              Copy
+  return (
+    <>
+      <div className="libraryHeader">
+        <span>Workspaces</span>
+        <span className="libraryCount">{launcherState.workspaces.length}</span>
+      </div>
+
+      <div className="list">
+        {launcherState.workspaces.map((workspace) => {
+          const isLaunching = launching?.workspaceId === workspace.id;
+          return (
+            <div className="wsRowWrap" key={workspace.key}>
+              <button
+                type="button"
+                className={`wsRow${workspace.isActive ? ' active' : ''}${editMode ? ' editing' : ''}`}
+                onClick={() => void onLaunch(workspace)}
+                disabled={disabled}
+              >
+                <span className="wsGlyph" aria-hidden="true">
+                  {isLaunching ? (
+                    <CircleNotch size={22} className="spin" />
+                  ) : (
+                    <MonitorPlay size={22} weight={workspace.isActive ? 'fill' : 'regular'} />
+                  )}
+                </span>
+                <span className="wsText">
+                  <span className="wsName">{workspace.name}</span>
+                  {isLaunching ? (
+                    <span className="wsPath">{launching.label}</span>
+                  ) : editMode ? (
+                    <span className="wsPath">{workspace.path}</span>
+                  ) : null}
+                </span>
+                {workspace.isActive ? (
+                  <span className="activePill">
+                    <span className="activeDot" aria-hidden="true" />
+                    Active
+                  </span>
+                ) : !editMode ? (
+                  <span className="wsTrail" aria-hidden="true">
+                    <CaretRight size={18} />
+                  </span>
+                ) : null}
+              </button>
+
+              {editMode ? (
+                <button
+                  className="wsGear"
+                  type="button"
+                  title={`Edit “${workspace.name}”`}
+                  aria-label={`Edit ${workspace.name}`}
+                  onClick={() => onEdit(workspace)}
+                >
+                  <Gear size={18} />
+                </button>
+              ) : null}
+            </div>
+          );
+        })}
+
+        {launcherState.errors.length > 0 ? (
+          <div className="detailsBox">
+            <div className="detailsHeader">
+              <strong>Details</strong>
+              <button className="bannerBtn" type="button" onClick={() => void onCopyDetails()}>
+                <Clipboard size={15} />
+                Copy
+              </button>
+            </div>
+            {launcherState.errors.map((error) => (
+              <p key={error}>{error}</p>
+            ))}
+          </div>
+        ) : null}
+      </div>
+    </>
+  );
+}
+
+function WorkspaceEditor({
+  workspace,
+  onCancel,
+  onSave,
+  onReset
+}: {
+  workspace: Workspace;
+  onCancel: () => void;
+  onSave: (workspace: Workspace, patch: WorkspaceOverridePatch) => Promise<void>;
+  onReset: (workspace: Workspace) => Promise<void>;
+}): JSX.Element {
+  const [name, setName] = useState(workspace.name);
+  const [path, setPath] = useState(workspace.path);
+  const [busy, setBusy] = useState(false);
+
+  async function handleChooseFolder(): Promise<void> {
+    const picked = await window.launcher.chooseDirectory();
+    if (picked) {
+      setPath(picked);
+    }
+  }
+
+  async function handleSave(): Promise<void> {
+    setBusy(true);
+    // Empty fields (or a path left at the detected folder) clear that override.
+    await onSave(workspace, {
+      name: name.trim(),
+      path: path.trim() && path.trim() !== workspace.key ? path.trim() : ''
+    });
+    setBusy(false);
+  }
+
+  async function handleReset(): Promise<void> {
+    setBusy(true);
+    await onReset(workspace);
+    setBusy(false);
+  }
+
+  return (
+    <div className="modalBackdrop">
+      <div className="modal" role="dialog" aria-modal="true" aria-labelledby="editor-title">
+        <span className="modalIcon edit" aria-hidden="true">
+          <Gear size={24} weight="fill" />
+        </span>
+        <h2 id="editor-title">Edit Workspace</h2>
+
+        <label className="field">
+          <span className="fieldLabel">Name</span>
+          <input
+            className="textInput"
+            type="text"
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+            placeholder="Workspace name"
+            autoFocus
+            spellCheck={false}
+          />
+        </label>
+
+        <label className="field">
+          <span className="fieldLabel">Folder</span>
+          <div className="pathRow">
+            <input
+              className="textInput"
+              type="text"
+              value={path}
+              onChange={(event) => setPath(event.target.value)}
+              placeholder="/path/to/workspace"
+              spellCheck={false}
+            />
+            <button className="chooseBtn" type="button" onClick={() => void handleChooseFolder()}>
+              <FolderOpen size={16} />
+              Choose…
             </button>
           </div>
-          {launcherState.errors.map((error) => (
-            <p key={error}>{error}</p>
-          ))}
+        </label>
+
+        <div className="modalActions">
+          {workspace.isCustomized ? (
+            <button
+              className="resetLink"
+              type="button"
+              onClick={() => void handleReset()}
+              disabled={busy}
+            >
+              Reset to detected
+            </button>
+          ) : null}
+          <span className="modalSpacer" />
+          <button className="btn btnGhost" type="button" onClick={onCancel} disabled={busy}>
+            Cancel
+          </button>
+          <button
+            className="btn btnPrimary"
+            type="button"
+            onClick={() => void handleSave()}
+            disabled={busy || !name.trim()}
+          >
+            {busy ? <CircleNotch size={16} className="spin" /> : null}
+            Save
+          </button>
         </div>
-      ) : null}
+      </div>
     </div>
   );
 }
@@ -380,22 +594,27 @@ function ConfirmDialog({
 }): JSX.Element {
   return (
     <div className="modalBackdrop">
-      <div
-        className="modal"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="confirm-title"
-      >
+      <div className="modal" role="dialog" aria-modal="true" aria-labelledby="confirm-title">
+        <span className="modalIcon" aria-hidden="true">
+          <Warning size={24} weight="fill" />
+        </span>
         <h2 id="confirm-title">Switch Workspace?</h2>
         <p>
-          Save any work first. The launcher will close ProPresenter and reopen "{workspace.name}".
+          Save any work first. The launcher will close ProPresenter and reopen it with{' '}
+          <b>{workspace.name}</b>.
         </p>
         <div className="modalActions">
-          <button className="secondaryButton" type="button" onClick={onCancel} disabled={busy}>
+          <span className="modalSpacer" />
+          <button className="btn btnGhost" type="button" onClick={onCancel} disabled={busy}>
             Cancel
           </button>
-          <button className="dangerButton" type="button" onClick={() => void onConfirm()} disabled={busy}>
-            {busy ? <Loader2 className="spin" size={16} /> : null}
+          <button
+            className="btn btnDanger"
+            type="button"
+            onClick={() => void onConfirm()}
+            disabled={busy}
+          >
+            {busy ? <CircleNotch size={16} className="spin" /> : null}
             Switch Workspace
           </button>
         </div>
@@ -406,18 +625,21 @@ function ConfirmDialog({
 
 function LoadingState(): JSX.Element {
   return (
-    <div className="loadingState">
-      <Loader2 className="spin" size={26} />
-      <span>Scanning</span>
+    <div className="placeholder">
+      <CircleNotch size={30} className="spin" />
+      <span>Scanning workspaces…</span>
     </div>
   );
 }
 
 function ErrorState(): JSX.Element {
   return (
-    <div className="emptyState">
-      <AlertCircle size={24} />
+    <div className="placeholder">
+      <span className="placeholderGlyph" aria-hidden="true">
+        <WarningCircle size={26} />
+      </span>
       <h2>Launcher unavailable</h2>
+      <p>The launcher could not start. Try reopening it.</p>
     </div>
   );
 }
@@ -442,7 +664,7 @@ function buildSupportDetails(state: LauncherState | null, message: string | null
     ...(state?.workspaces.length
       ? state.workspaces.map(
           (workspace) =>
-            `- ${workspace.isActive ? '[active] ' : ''}${workspace.name} (${workspace.source}): ${workspace.path}`
+            `- ${workspace.isActive ? '[active] ' : ''}${workspace.name}${workspace.isCustomized ? ' (custom)' : ''} (${workspace.source}): ${workspace.path}`
         )
       : ['- none'])
   ];
