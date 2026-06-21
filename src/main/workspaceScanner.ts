@@ -1,7 +1,7 @@
 import { readdir, stat } from 'node:fs/promises';
 import { basename, join } from 'node:path';
 import type { Workspace } from '../shared/types';
-import { getWorkspaceRootConfig } from './config';
+import { getWorkspaceOverrides, getWorkspaceRootConfig } from './config';
 import { logError } from './logger';
 import {
   readActiveWorkspaceState,
@@ -26,6 +26,7 @@ function registryName(entry: WorkspaceRegistryEntry | undefined, fallbackPath: s
 export async function scanWorkspaces(): Promise<WorkspaceScanResult> {
   const errors: string[] = [];
   const { workspaceRoot, isCustomWorkspaceRoot } = await getWorkspaceRootConfig();
+  const overrides = await getWorkspaceOverrides();
   const directories = new Set<string>();
 
   let activeState = await readActiveWorkspaceState().catch((error: unknown) => {
@@ -80,12 +81,18 @@ export async function scanWorkspaces(): Promise<WorkspaceScanResult> {
   const workspaces = [...directories]
     .map((directoryPath): Workspace => {
       const registryEntry = registryByPath.get(directoryPath);
+      const override = overrides[directoryPath];
+      const effectivePath = override?.path ?? directoryPath;
+      const name = override?.name ?? registryName(registryEntry, directoryPath);
+
       return {
-        id: directoryPath,
-        name: registryName(registryEntry, directoryPath),
-        path: directoryPath,
-        isActive: samePath(activeState.activePath, directoryPath),
-        source: registryEntry ? 'registry' : 'folder'
+        id: effectivePath,
+        key: directoryPath,
+        name,
+        path: effectivePath,
+        isActive: samePath(activeState.activePath, effectivePath),
+        source: registryEntry ? 'registry' : 'folder',
+        isCustomized: Boolean(override)
       };
     })
     .sort((left, right) => left.name.localeCompare(right.name));

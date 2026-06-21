@@ -1,8 +1,17 @@
 import { BrowserWindow, dialog, type OpenDialogOptions } from 'electron';
 import { stat } from 'node:fs/promises';
-import type { LauncherState, LaunchResult, LaunchWorkspaceOptions } from '../shared/types';
+import type {
+  LauncherState,
+  LaunchResult,
+  LaunchWorkspaceOptions,
+  WorkspaceOverridePatch
+} from '../shared/types';
 import { writeActiveWorkspace } from './activeWorkspace';
-import { setCustomWorkspaceRoot } from './config';
+import {
+  clearWorkspaceOverride,
+  setCustomWorkspaceRoot,
+  setWorkspaceOverride
+} from './config';
 import { getSupportLogPath, logError, logInfo } from './logger';
 import { normalizeFilePath } from './pathUtils';
 import { scanWorkspaces } from './workspaceScanner';
@@ -51,6 +60,54 @@ export async function chooseWorkspacesFolder(
     await logInfo('Custom workspace folder selected', { selectedPath });
   }
 
+  return getLauncherState();
+}
+
+export async function chooseDirectory(
+  parentWindow: BrowserWindow | undefined
+): Promise<string | null> {
+  const dialogOptions: OpenDialogOptions = {
+    title: 'Choose Workspace Folder',
+    buttonLabel: 'Choose',
+    properties: ['openDirectory']
+  };
+
+  const result = parentWindow
+    ? await dialog.showOpenDialog(parentWindow, dialogOptions)
+    : await dialog.showOpenDialog(dialogOptions);
+
+  const selectedPath = result.filePaths[0];
+  if (result.canceled || !selectedPath) {
+    return null;
+  }
+
+  return normalizeFilePath(selectedPath);
+}
+
+export async function updateWorkspaceOverride(
+  key: string,
+  patch: WorkspaceOverridePatch
+): Promise<LauncherState> {
+  if (typeof patch.path === 'string' && patch.path.trim()) {
+    const targetPath = normalizeFilePath(patch.path);
+    try {
+      const stats = await stat(targetPath);
+      if (!stats.isDirectory()) {
+        throw new Error('not a directory');
+      }
+    } catch {
+      throw new Error('That folder could not be found. Choose an existing workspace folder.');
+    }
+  }
+
+  await setWorkspaceOverride(key, patch);
+  await logInfo('Workspace override updated', { key, patch });
+  return getLauncherState();
+}
+
+export async function resetWorkspaceOverride(key: string): Promise<LauncherState> {
+  await clearWorkspaceOverride(key);
+  await logInfo('Workspace override cleared', { key });
   return getLauncherState();
 }
 
