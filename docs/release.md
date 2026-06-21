@@ -59,6 +59,9 @@ exported as a `.p12` file. `APPLE_API_KEY_BASE64` should be a base64-encoded App
 Connect `.p8` key file; the workflow writes it to a temporary file and exposes that path as
 `APPLE_API_KEY` for electron-builder.
 
+The workflow validates the certificate subject before building. If it does not contain
+`Developer ID Application`, replace `MACOS_CERTIFICATE_BASE64` with the correct `.p12`.
+
 The workflow uses the built-in `GITHUB_TOKEN` as `GH_TOKEN` for electron-builder publishing.
 
 ## Verify

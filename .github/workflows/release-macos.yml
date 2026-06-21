@@ -33,6 +33,14 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Validate Developer ID certificate
+        run: |
+          CERT_PATH="$RUNNER_TEMP/signing-certificate.p12"
+          node -e "require('node:fs').writeFileSync(process.argv[1], Buffer.from(process.env.CSC_LINK, 'base64'))" "$CERT_PATH"
+          CERT_SUBJECT="$(openssl pkcs12 -in "$CERT_PATH" -nokeys -clcerts -passin "pass:$CSC_KEY_PASSWORD" 2>/dev/null | openssl x509 -noout -subject)"
+          echo "$CERT_SUBJECT"
+          echo "$CERT_SUBJECT" | grep "Developer ID Application"
+
       - name: Write notarization API key
         env:
           APPLE_API_KEY_BASE64: ${{ secrets.APPLE_API_KEY_BASE64 }}
