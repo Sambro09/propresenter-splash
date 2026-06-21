@@ -35,10 +35,11 @@ Implemented:
 
 Implemented:
 
-- Exact running-state check using AppleScript bundle-id lookup.
+- Exact running-state check using the ProPresenter process name.
 - Confirmation modal before quitting ProPresenter for a workspace switch.
-- Graceful quit request through AppleScript, then polling until the main app terminates.
-- Timeout error if ProPresenter does not quit; no force-kill.
+- Process-level close request to avoid ProPresenter's own quit prompt, then polling until the main
+  app terminates.
+- Timeout error if ProPresenter does not close.
 - Fast path for selecting the already-active workspace while ProPresenter is running: focus
   ProPresenter without rewriting preferences or restarting it.
 
@@ -60,7 +61,7 @@ Configured:
 - `electron-builder` macOS packaging with DMG and zip targets.
 - Hardened runtime.
 - App and inherited entitlements files.
-- Apple Events usage string for quitting/focusing ProPresenter.
+- Apple Events usage string for locate/focus fallback paths.
 - Built-in notarization enabled for release builds when Apple credentials are present.
 - GitHub Actions release workflow for signed/notarized macOS artifacts when repository secrets
   are configured.

@@ -9,6 +9,7 @@ const COMMON_APP_PATHS = [
   join(homedir(), 'Applications', 'ProPresenter.app'),
   '/Applications/ProPresenter.app'
 ];
+const PROPRESENTER_PROCESS_NAME = 'ProPresenter';
 
 async function exists(path: string): Promise<boolean> {
   try {
@@ -77,11 +78,8 @@ async function resolveLaunchServicesAppPath(): Promise<string | undefined> {
 
 export async function isProPresenterRunning(): Promise<boolean> {
   try {
-    const { stdout } = await runCommand('osascript', [
-      '-e',
-      `application id "${PROPRESENTER_BUNDLE_ID}" is running`
-    ]);
-    return stdout.trim() === 'true';
+    await runCommand('pgrep', ['-x', PROPRESENTER_PROCESS_NAME], { timeout: 8_000 });
+    return true;
   } catch {
     return false;
   }
@@ -99,10 +97,7 @@ export async function focusProPresenter(appPath: string): Promise<void> {
 }
 
 export async function quitProPresenterAndWait(timeoutMs = 30_000): Promise<void> {
-  await runCommand('osascript', [
-    '-e',
-    `tell application id "${PROPRESENTER_BUNDLE_ID}" to quit`
-  ]);
+  await requestProPresenterQuit();
 
   const startedAt = Date.now();
   while (Date.now() - startedAt < timeoutMs) {
@@ -114,6 +109,25 @@ export async function quitProPresenterAndWait(timeoutMs = 30_000): Promise<void>
   }
 
   throw new Error('ProPresenter did not quit within 30 seconds.');
+}
+
+async function requestProPresenterQuit(): Promise<void> {
+  try {
+    await runCommand('pkill', ['-TERM', '-x', PROPRESENTER_PROCESS_NAME], { timeout: 8_000 });
+    return;
+  } catch (error) {
+    if (!(await isProPresenterRunning())) {
+      return;
+    }
+
+    throw new Error(
+      `Could not close ProPresenter without showing its quit prompt. ${formatQuitError(error)}`
+    );
+  }
+}
+
+function formatQuitError(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }
 
 export async function launchProPresenter(appPath: string): Promise<void> {
