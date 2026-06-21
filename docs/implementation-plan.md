@@ -1,13 +1,96 @@
 # ProPresenter Workspace Launcher Implementation Plan
 
-Status: Phase 0 validated locally
+Status: launcher implemented; release/update infrastructure configured
 Date: 2026-06-21
 
 ## Current State
 
-The repository currently contains docs only; no app source has been scaffolded yet.
-Phase 0 has validated the core active-workspace mechanism for the installed ProPresenter 21.4
-copy. See `docs/phase0-findings.md` for the detailed evidence and command sequence.
+The repository now contains an Electron + TypeScript + Vite app with a React renderer.
+The implementation follows the Phase 0 write contract from `docs/phase0-findings.md`:
+
+- Read workspaces from the configured `UserWorkspaces` folder.
+- Decode ProPresenter's `userWorkspaces` preference as the preferred source of names and
+  active state.
+- Write only `applicationShowDirectory` and `userWorkspaces` when switching workspaces.
+- Use `defaults` writes and readback verification rather than raw plist mutation.
+- Launch ProPresenter by resolved app path after the active-workspace write succeeds.
+
+## Implemented Phases
+
+### Phase 1: MVP Launcher
+
+Implemented:
+
+- Electron app scaffold with isolated preload bridge and `nodeIntegration: false`.
+- Main-process modules for workspace scanning, active-workspace read/write, ProPresenter
+  process/app control, IPC, config, and logging.
+- Renderer list view that marks the active workspace and shows ProPresenter installed/running
+  state.
+- PP-closed launch path: validate the workspace folder, write preferences, verify readback,
+  launch ProPresenter, and close the splash window.
+- Graceful states for ProPresenter not found, empty workspace list, inaccessible folders, and
+  preference read/write failures.
+
+### Phase 2: Running-ProPresenter Flow
+
+Implemented:
+
+- Exact running-state check using AppleScript bundle-id lookup.
+- Confirmation modal before quitting ProPresenter for a workspace switch.
+- Graceful quit request through AppleScript, then polling until the main app terminates.
+- Timeout error if ProPresenter does not quit; no force-kill.
+- Fast path for selecting the already-active workspace while ProPresenter is running: focus
+  ProPresenter without rewriting preferences or restarting it.
+
+### Phase 3: Hardening
+
+Implemented:
+
+- Manual rescan button.
+- Custom workspace folder picker with persisted config.
+- Support log under Electron `userData`.
+- Copyable support details from visible errors.
+- ProPresenter download link when the app is not installed.
+- Startup fallback to the standard workspace root if launcher config is missing or malformed.
+
+### Phase 4: Packaging & Internal Release
+
+Configured:
+
+- `electron-builder` macOS packaging with DMG and zip targets.
+- Hardened runtime.
+- App and inherited entitlements files.
+- Apple Events usage string for quitting/focusing ProPresenter.
+- Built-in notarization enabled for release builds when Apple credentials are present.
+- GitHub Actions release workflow for signed/notarized macOS artifacts when repository secrets
+  are configured.
+
+Not performed in this worktree:
+
+- Actual Developer ID signing and Apple notarization. Those require a valid Apple Developer
+  Program team, a Developer ID Application certificate, and notarization credentials on the
+  release machine or CI runner.
+
+See `docs/release.md` for release commands and verification gates.
+
+### Phase 5: Public-Distribution Readiness
+
+Implemented/scaffolded:
+
+- `electron-updater` integration that runs only in packaged builds.
+- GitHub Releases publish/feed configuration for `Sambro09/propresenter-splash`.
+- Release workflow that builds, notarizes, publishes, and uploads macOS artifacts.
+- Local-only diagnostics logging for unhandled main-process errors and renderer/child process
+  exits.
+- Support guide in `docs/support.md`.
+- Compatibility and update-feed test matrix in `docs/testing-matrix.md`.
+
+Not implemented by design:
+
+- Remote crash/usage telemetry. The app currently keeps diagnostics local because no privacy
+  policy, endpoint, or stakeholder decision exists for remote collection.
+- Workspace management features from §13. They remain explicit future enhancements outside the
+  minimal launcher scope.
 
 ## Local ProPresenter Findings
 
@@ -21,158 +104,47 @@ Observed on this machine:
 - Support root: `~/Library/Application Support/RenewedVision/ProPresenter`
 - User workspace root: `~/Library/Application Support/RenewedVision/ProPresenter/UserWorkspaces`
 
-This differs from the draft spec in two important ways:
-
-- The bundle/preference identifier is lowercase: `com.renewedvision.propresenter`.
-- The user workspace directory is `UserWorkspaces`, not `User Workspaces`.
-
-Workspaces currently found under `UserWorkspaces`:
-
-- `Facilities`
-- `Kids`
-- `Traditions`
-- `Youth`
-
-The active workspace was originally `Kids`. Phase 0 temporarily switched to `Youth` through
-preferences, launched ProPresenter successfully, verified persistence after quit, and restored
-the original `Kids` baseline.
-
 Relevant preference keys:
 
-- `applicationShowDirectory` is set to
-  `~/Library/Application Support/RenewedVision/ProPresenter/UserWorkspaces/Kids`.
-- `userWorkspaces` is an `NSData` preference containing a JSON array. Decoded shape:
+- `applicationShowDirectory`
+- `userWorkspaces`, an `NSData` preference containing UTF-8 JSON array bytes.
 
-```json
-[
-  {
-    "name": "Kids",
-    "minimumRequiredProPresenterVersion": "22.0.0",
-    "isActive": true,
-    "url": "file:///Users/sam/Library/Application%20Support/RenewedVision/ProPresenter/UserWorkspaces/Kids/"
-  }
-]
+## Commands
+
+Development:
+
+```sh
+npm install
+npm run dev
 ```
 
-The real value contains one object per workspace. Only `Kids` currently has `isActive: true`.
+Verification:
 
-Process detection note:
+```sh
+npm run typecheck
+npm run build
+npx electron-builder --mac --dir --config.mac.notarize=false --config.mac.identity=null
+```
 
-- `ProPresenter` itself is not currently running.
-- ProPresenter helper processes may remain running, so app-running detection must not use a
-  loose process-name match. Use exact `ProPresenter` process detection, Launch Services, or
-  AppleScript running-state checks.
+Release:
 
-## Validated Active-Workspace Mechanism
+```sh
+npm run dist
+npm run release
+```
 
-For ProPresenter 21.4 on this machine, active workspace selection is preference-backed.
-
-To switch workspaces externally, the launcher should update both:
-
-1. `applicationShowDirectory` to the selected workspace path.
-2. `userWorkspaces` so exactly one workspace has `isActive: true`.
-
-This was validated by switching from `Kids` to `Youth` while ProPresenter was closed, launching
-ProPresenter, observing ProPresenter update its saved library path to the `Youth` workspace,
-quitting, and confirming the active state did not revert.
-
-## Phase 0 Outcome
-
-Phase 0 is complete enough to proceed with implementation.
-
-Confirmed:
-
-- exact preference domain: `com.renewedvision.propresenter`
-- exact default workspace root: `~/Library/Application Support/RenewedVision/ProPresenter/UserWorkspaces`
-- active directory key: `applicationShowDirectory`
-- workspace registry key: `userWorkspaces`
-- `userWorkspaces` encoding: `NSData` containing UTF-8 JSON array bytes
-- write method: `defaults write ... applicationShowDirectory -string ...` plus
-  `defaults write ... userWorkspaces -data <hex>`
-- launch behavior: ProPresenter accepted the external switch and did not revert after quit
-
-Not required for v1 implementation, but still useful later:
-
-- Manual in-app Active Workspace switch diff for comparison with the externally written state.
-
-## Recommended Build Plan
-
-### Phase 1: Scaffold + Read-Only MVP
-
-Create an Electron + TypeScript + Vite app with a minimal renderer. Keep all ProPresenter
-integration in the main process.
-
-Initial modules:
-
-- `proPresenterLocator`: resolve app path by bundle id and fallback common locations.
-- `workspaceScanner`: list directories under `UserWorkspaces`; merge with decoded
-  `userWorkspaces` preference when present.
-- `activeWorkspace`: read `applicationShowDirectory` and decoded `userWorkspaces`.
-- `proPresenterController`: detect exact running app state; launch/focus by resolved app path.
-- `ipc`: typed bridge for `listWorkspaces`, `getActiveWorkspace`, `launchWorkspace`, and
-  `rescan`.
-
-At the end of this phase the app should list workspaces and clearly mark the active one.
-Switching can land in Phase 2 using the validated preference write contract.
-
-### Phase 2: PP-Closed Switching
-
-Implement switching while ProPresenter is closed:
-
-- Validate selected workspace still exists.
-- Update active workspace preferences through `defaults` or another cfprefsd-aware API.
-- Re-read preferences after write and abort if they do not match.
-- Launch ProPresenter.
-- Close the splash window after successful launch.
-
-### Phase 3: Running-ProPresenter Flow
-
-Add running-state handling:
-
-- If selected workspace is already active and ProPresenter is running, focus ProPresenter.
-- Otherwise show a confirmation dialog warning the user to save work.
-- Quit ProPresenter gracefully.
-- Wait until exact main process termination; ignore helper processes.
-- Write active workspace.
-- Launch ProPresenter.
-
-### Phase 4: Hardening
-
-Add:
-
-- empty state
-- ProPresenter-not-found state
-- manual rescan
-- custom workspace folder fallback
-- copyable support details
-- basic file logging for failed reads/writes/launches
-
-### Phase 5: Packaging
-
-Package as a direct-distribution macOS app:
-
-- non-sandboxed
-- hardened runtime
-- Developer ID signing
-- notarized and stapled
-- DMG and zip outputs through `electron-builder`
-
-## Decisions To Carry Into Implementation
-
-- Use `com.renewedvision.propresenter` as the default bundle id/domain.
-- Use `UserWorkspaces` as the default workspace folder.
-- Treat the preference registry as the source of display names and active state when available.
-- Treat folder names as fallback display names.
-- Keep all ProPresenter-specific paths and keys centralized in one module.
-- Do not parse or modify workspace content files for v1.
-- Do not match helper processes as "ProPresenter is running".
+`npm run dist` expects a Developer ID signing identity plus notarization credentials.
+`npm run release` also expects `GH_TOKEN` so electron-builder can publish to GitHub Releases.
+Use `docs/release.md` as the release checklist.
 
 ## Remaining Risks
 
+- The ProPresenter active-workspace mechanism is undocumented and could change in future
+  ProPresenter releases.
 - The `userWorkspaces` JSON contains `minimumRequiredProPresenterVersion: "22.0.0"` despite
-  this local app reporting `21.4.0`; do not use that field for compatibility gating until it is
-  understood.
-- No additional required active-workspace state was observed, but future testing should keep
-  checking for schema changes.
-- ProPresenter may rewrite preferences on quit if switching is attempted while it is running.
-- Future ProPresenter versions could change the preference schema.
+  this local app reporting `21.4.0`; the launcher intentionally does not use that field for
+  compatibility gating.
+- Custom workspace folders are user-selected; the app validates directory access but does not
+  create or repair ProPresenter registry entries.
+- Public distribution still requires executing the compatibility matrix on additional
+  ProPresenter/macOS versions and deciding whether remote diagnostics are appropriate.

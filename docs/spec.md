@@ -1,7 +1,7 @@
 # ProPresenter Workspace Launcher — Specification
 
 > Working title: **ProPresenter Workspace Launcher** (repo: `propresenter-splash`)
-> Status: Draft v0.1 — Phase 0 completed 2026-06-21; Phase 1 next
+> Status: Draft v0.3 — launcher implemented; release/update infrastructure configured; signed release requires Apple credentials
 > Platform: macOS · Electron · Target app: **ProPresenter 21+**
 
 ---
@@ -251,20 +251,20 @@ Goal: nail down the undocumented mechanics. Deliverable complete:
   on quit.
 - Restored the test machine to its original active workspace after validation.
 
-### Phase 1 — MVP launcher (PP-closed path) *(next)*
+### Phase 1 — MVP launcher (PP-closed path) *(implemented)*
 Scan → list → show active (FR1, FR2) → set active + launch when PP is closed (FR3, FR6, FR7).
 
-### Phase 2 — Running-PP handling
+### Phase 2 — Running-PP handling *(implemented)*
 Detect running PP, confirm dialog, graceful quit + relaunch, fast-path focus (FR4, FR5).
 
-### Phase 3 — Hardening
+### Phase 3 — Hardening *(implemented)*
 Error/empty states, custom workspace folder (FR8, FR9), polish, basic logging for support.
 
-### Phase 4 — Packaging & internal release
+### Phase 4 — Packaging & internal release *(configured; credential-gated)*
 Code-sign (Developer ID) + notarize + staple; entitlements; signed DMG/zip; install on church
 machines.
 
-### Phase 5 — Public-distribution readiness *(future)*
+### Phase 5 — Public-distribution readiness *(scaffolded)*
 Auto-update (`electron-updater` + release feed), broader macOS/PP-version testing, crash/usage
 diagnostics, support docs, and the "niceties"/management features in §13.
 

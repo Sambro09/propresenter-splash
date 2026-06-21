@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { homedir } from 'node:os';
 import { PROPRESENTER_BUNDLE_ID } from './proPresenterConstants';
 import { runCommand } from './shell';
+import { normalizeFilePath } from './pathUtils';
 
 const COMMON_APP_PATHS = [
   join(homedir(), 'Applications', 'ProPresenter.app'),
@@ -11,8 +12,8 @@ const COMMON_APP_PATHS = [
 
 async function exists(path: string): Promise<boolean> {
   try {
-    const stats = await stat(path);
-    return stats.isDirectory();
+    const appStats = await stat(path);
+    return appStats.isDirectory();
   } catch {
     return false;
   }
@@ -20,6 +21,11 @@ async function exists(path: string): Promise<boolean> {
 
 export async function locateProPresenter(): Promise<string | undefined> {
   const candidates = new Set<string>();
+
+  const launchServicesPath = await resolveLaunchServicesAppPath();
+  if (launchServicesPath && (await exists(launchServicesPath))) {
+    candidates.add(launchServicesPath);
+  }
 
   for (const appPath of COMMON_APP_PATHS) {
     if (await exists(appPath)) {
@@ -44,12 +50,29 @@ export async function locateProPresenter(): Promise<string | undefined> {
     // Spotlight is a convenience path, not a hard dependency.
   }
 
-  return [...candidates].sort((left, right) => scoreAppPath(left) - scoreAppPath(right))[0];
+  const candidateInfos = await Promise.all(
+    [...candidates].map(async (appPath) => {
+      const appStats = await stat(appPath);
+      return { appPath, modifiedAt: appStats.mtimeMs };
+    })
+  );
+
+  return candidateInfos.sort(
+    (left, right) => right.modifiedAt - left.modifiedAt || left.appPath.localeCompare(right.appPath)
+  )[0]?.appPath;
 }
 
-function scoreAppPath(appPath: string): number {
-  const commonIndex = COMMON_APP_PATHS.indexOf(appPath);
-  return commonIndex === -1 ? 100 : commonIndex;
+async function resolveLaunchServicesAppPath(): Promise<string | undefined> {
+  try {
+    const { stdout } = await runCommand('osascript', [
+      '-e',
+      `POSIX path of (path to application id "${PROPRESENTER_BUNDLE_ID}")`
+    ]);
+    const appPath = stdout.trim();
+    return appPath ? normalizeFilePath(appPath) : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 export async function isProPresenterRunning(): Promise<boolean> {
@@ -62,6 +85,35 @@ export async function isProPresenterRunning(): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+export async function focusProPresenter(appPath: string): Promise<void> {
+  try {
+    await runCommand('osascript', [
+      '-e',
+      `tell application id "${PROPRESENTER_BUNDLE_ID}" to activate`
+    ]);
+  } catch {
+    await launchProPresenter(appPath);
+  }
+}
+
+export async function quitProPresenterAndWait(timeoutMs = 30_000): Promise<void> {
+  await runCommand('osascript', [
+    '-e',
+    `tell application id "${PROPRESENTER_BUNDLE_ID}" to quit`
+  ]);
+
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < timeoutMs) {
+    if (!(await isProPresenterRunning())) {
+      return;
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
+
+  throw new Error('ProPresenter did not quit within 30 seconds.');
 }
 
 export async function launchProPresenter(appPath: string): Promise<void> {

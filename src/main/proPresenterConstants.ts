@@ -2,6 +2,7 @@ import { join } from 'node:path';
 import { homedir } from 'node:os';
 
 export const PROPRESENTER_BUNDLE_ID = 'com.renewedvision.propresenter';
+export const PROPRESENTER_DOWNLOAD_URL = 'https://www.renewedvision.com/propresenter/download';
 export const PREFERENCES_DOMAIN = PROPRESENTER_BUNDLE_ID;
 export const APPLICATION_SHOW_DIRECTORY_KEY = 'applicationShowDirectory';
 export const USER_WORKSPACES_KEY = 'userWorkspaces';
