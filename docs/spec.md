@@ -58,7 +58,7 @@ sit down at the machine.
 |---|---|
 | **Distribution (v1)** | Internal, **code-signed + notarized** (Apple Developer ID). |
 | **Distribution (future)** | **Public distribution** — keep the architecture and packaging ready for it from day one. |
-| **ProPresenter already running** | **Prompt** the user (remind them to save), then **quit & relaunch** into the chosen workspace. |
+| **ProPresenter already running** | **Prompt** the user in the launcher (remind them to save), then close & relaunch into the chosen workspace without requiring ProPresenter's own quit prompt. |
 | **v1 feature scope** | **Minimal launcher** — list + click-to-launch. |
 
 ---
@@ -133,7 +133,8 @@ The spike (§11) decides which approach ships in v1.
 - **FR3 — Launch into selection (PP closed).** Clicking a workspace sets it active and starts
   ProPresenter in it.
 - **FR4 — Launch into selection (PP running).** If ProPresenter is running, show a confirmation
-  dialog that warns to save work, then quit ProPresenter, switch, and relaunch.
+  dialog that warns to save work, then close ProPresenter without surfacing its own quit prompt,
+  switch, and relaunch.
 - **FR5 — No-op fast path.** If the user picks the workspace that is already active **and**
   ProPresenter is already running, just bring ProPresenter to the front (no restart).
 - **FR6 — Locate ProPresenter.** Find the ProPresenter app even if not in `/Applications`
@@ -175,8 +176,8 @@ A single, frameless, centered window (~480×620), styled like a clean macOS laun
 ### Interaction states
 - **Scanning** — brief spinner while the folder is read.
 - **List** — rows of workspaces; the active one is badged; whole row is the click target.
-- **Confirm (PP running)** — modal: *"ProPresenter is open. Save any work first. Quit
-  ProPresenter and switch to '<name>'?"* → **Quit & Switch** / **Cancel**.
+- **Confirm (PP running)** — modal: *"Save any work first. The launcher will close ProPresenter
+  and reopen '<name>'."* → **Switch Workspace** / **Cancel**.
 - **Launching** — row shows progress ("Quitting ProPresenter…", "Opening '<name>'…").
 - **Empty** — "No ProPresenter workspaces found" + expected location + **Choose folder…** (FR9).
 - **PP not installed** — message + link to download.
@@ -224,8 +225,8 @@ poll until terminated (timeout ~10s) → activeWorkspace.write(id) → controlle
 - ProPresenter **not installed** → empty/installed-check message (FR6).
 - **No workspaces** found at standard or configured path → empty state + folder picker (FR9).
 - Workspaces folder **inaccessible** (permissions/TCC) → guidance message.
-- ProPresenter **fails to quit** within timeout → surface error; do not force-kill by default
-  (risk of data loss); offer Retry.
+- ProPresenter **fails to close** within timeout → surface error, keep the user in the launcher,
+  and offer Retry.
 - Selected workspace **deleted between scan and click** → re-scan and show error.
 - **Multiple ProPresenter installs** / non-standard install path → resolve via bundle id;
   if ambiguous, pick the running one or the newest.
@@ -275,10 +276,9 @@ diagnostics, support docs, and the "niceties"/management features in §13.
 ### macOS permissions
 - Reading `~/Library/Application Support/RenewedVision/…` and `~/Library/Preferences/…` is in
   the user's own home — fine for a **non-sandboxed**, notarized, hardened-runtime app.
-- **Hardened runtime** is required for notarization. Likely entitlements:
-  - Automation/Apple Events (`com.apple.security.automation.apple-events`) **if** we quit PP via
-    AppleScript — this triggers a one-time TCC consent prompt; include a clear
-    `NSAppleEventsUsageDescription`.
+- **Hardened runtime** is required for notarization. Apple Events are only used for locate/focus
+  fallback paths; the workspace-switch quit path uses process detection/termination to avoid
+  ProPresenter's own quit prompt.
 - **Do not sandbox** for direct distribution: a sandboxed app cannot read another app's prefs/
   support files. (This is why **Mac App Store is a poor fit** — see §13.)
 
@@ -333,8 +333,9 @@ diagnostics, support docs, and the "niceties"/management features in §13.
 - **AC1.** With PP 21 installed, ≥2 workspaces, and PP **closed**: opening the app lists all
   workspaces and marks the active one; clicking one launches PP into **exactly** that workspace
   (verified by PP's Active Workspace).
-- **AC2.** With PP **running**: clicking a different workspace prompts the user, then quits and
-  relaunches PP into the chosen workspace.
+- **AC2.** With PP **running**: clicking a different workspace prompts the user inside the
+  launcher, then closes and relaunches PP into the chosen workspace without an extra ProPresenter
+  quit prompt.
 - **AC3.** Clicking the already-active workspace while PP is running just focuses PP (no restart).
 - **AC4.** PP-not-installed and no-workspaces-found show clear, non-crashing states.
 - **AC5.** The shipped build is signed + notarized and opens on a clean church Mac without

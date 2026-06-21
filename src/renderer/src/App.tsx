@@ -386,15 +386,17 @@ function ConfirmDialog({
         aria-modal="true"
         aria-labelledby="confirm-title"
       >
-        <h2 id="confirm-title">Quit ProPresenter?</h2>
-        <p>Save any work first. Quit ProPresenter and switch to "{workspace.name}"?</p>
+        <h2 id="confirm-title">Switch Workspace?</h2>
+        <p>
+          Save any work first. The launcher will close ProPresenter and reopen "{workspace.name}".
+        </p>
         <div className="modalActions">
           <button className="secondaryButton" type="button" onClick={onCancel} disabled={busy}>
             Cancel
           </button>
           <button className="dangerButton" type="button" onClick={() => void onConfirm()} disabled={busy}>
             {busy ? <Loader2 className="spin" size={16} /> : null}
-            Quit & Switch
+            Switch Workspace
           </button>
         </div>
       </div>

@@ -38,8 +38,10 @@ select the relocated `UserWorkspaces` folder.
 
 ### ProPresenter Will Not Quit
 
-Ask the operator to save work in ProPresenter and quit it manually. Then retry the workspace
-launch. The launcher intentionally does not force-kill ProPresenter because that can lose work.
+The launcher asks the operator to save work first, then sends ProPresenter a normal termination
+signal so ProPresenter's own extra quit confirmation does not block the workspace switch. If the
+launcher still reports that ProPresenter did not quit, ask the operator to quit ProPresenter
+manually and retry the workspace launch.
 
 ### Workspace Switch Fails
 
