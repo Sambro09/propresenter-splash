@@ -19,6 +19,20 @@ The support log is stored in Electron's app data folder as `propresenter-splash.
 local diagnostic events only. ProPresenter Splash does not send telemetry or crash reports to a
 remote server.
 
+## Shared Mac Setup
+
+For each presentation Mac:
+
+1. Install ProPresenter Splash in `/Applications`.
+2. Open ProPresenter Splash, enable **Edit Mode** from the Workspaces menu, and turn on
+   **Launch at login**.
+3. Leave **Focused startup mode** enabled for the shared presentation account.
+4. Remove ProPresenter from macOS Login Items. ProPresenter must not open before the launcher.
+5. Remove unrelated apps from Login Items for the shared presentation account.
+6. Pin or move common service workspaces in Edit Mode.
+7. Quit ProPresenter after a test launch and verify the launcher returns with **Log Out**,
+   **Choose Another Workspace**, and **Reopen Last Workspace**.
+
 ## Common Cases
 
 ### ProPresenter Not Found

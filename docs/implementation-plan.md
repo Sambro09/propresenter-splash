@@ -1,6 +1,6 @@
 # ProPresenter Splash Implementation Plan
 
-Status: launcher implemented; release/update infrastructure configured
+Status: launcher implemented; P0 operator workflow implemented; release/update infrastructure configured
 Date: 2026-06-21
 
 ## Current State
@@ -88,21 +88,22 @@ simple list first, with support actions appearing only when something fails.
 
 ### P0 before church rollout
 
-- **Launch at login:** add an app setting or deployment script that registers the launcher as a
-  Login Item, and document that ProPresenter must not also be a Login Item.
-- **Operator/startup mode:** add a configuration flag that opens the launcher as a focused,
-  centered or full-screen window on login. It should be visually dominant enough that the user
-  naturally starts there without needing a true kiosk lock.
-- **Clean first screen:** show only the workspace choices, active badge, and necessary error
-  banners in normal mode. Keep folder paths, edit controls, and support details hidden unless
-  Admin/Edit Mode is enabled or an error occurs.
-- **Workspace ordering:** allow admins to set a fixed order or pin important workspaces so the
-  most common service is always in the same place.
-- **End-of-session prompt:** after the launcher opens ProPresenter, keep the launcher process
-  alive in the background and watch for ProPresenter to quit. When it quits, show a simple screen:
-  `Log Out`, `Choose Another Workspace`, and `Reopen Last Workspace`.
-- **Logout handoff:** make `Log Out` open the standard macOS logout confirmation instead of
-  forcing an immediate logout. This keeps the app from destroying unsaved work in other apps.
+Implemented:
+
+- **Launch at login:** Edit Mode exposes a Login Item toggle for the launcher. Deployment docs
+  state that ProPresenter must not also be a Login Item.
+- **Operator/startup mode:** Edit Mode exposes a focused startup mode flag. When enabled, the
+  launcher opens centered, larger, and focused for the shared-account handoff.
+- **Clean first screen:** normal mode shows the workspace choices, active badge, launch state, and
+  necessary error banners. Folder paths, setup controls, and workspace editing remain behind
+  Edit Mode or visible error states.
+- **Workspace ordering:** Edit Mode lets admins pin workspaces and move them up/down. The order is
+  persisted in launcher config and applied before the alphabetical fallback.
+- **End-of-session prompt:** successful launches keep the app process alive, hide the launcher,
+  watch ProPresenter, and restore the launcher after ProPresenter quits with `Log Out`,
+  `Choose Another Workspace`, and `Reopen Last Workspace`.
+- **Logout handoff:** `Log Out` requests the standard macOS logout confirmation through System
+  Events rather than forcing immediate logout.
 
 ### P1 soon after rollout
 
@@ -140,6 +141,19 @@ simple list first, with support actions appearing only when something fails.
 - The setup can be repeated on another Mac from documented steps.
 
 ## Implemented Phases
+
+### P0: Operator Rollout Workflow
+
+Implemented:
+
+- Login Item toggle in Edit Mode via Electron's macOS Login Item API.
+- Focused startup mode stored in launcher config.
+- Normal-mode screen kept to workspace selection and failure banners.
+- Edit-only admin controls for rescan, workspace folder selection, workspace renaming/repointing,
+  pinning, and ordering.
+- Session watcher that restores the launcher when ProPresenter exits.
+- End-of-session actions for logout handoff, choosing another workspace, and reopening the last
+  workspace.
 
 ### Phase 1: MVP Launcher
 

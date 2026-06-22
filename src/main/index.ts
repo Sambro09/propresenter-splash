@@ -6,6 +6,7 @@ import { electronApp, optimizer } from '@electron-toolkit/utils';
 import type {
   LaunchResult,
   LaunchWorkspaceOptions,
+  WorkspaceOrderDirection,
   WorkspaceOverridePatch
 } from '../shared/types';
 import { initializeDiagnostics } from './diagnostics';
@@ -15,20 +16,33 @@ import {
   chooseWorkspacesFolder,
   getLauncherState,
   launchWorkspace,
+  moveWorkspace,
+  requestLogoutConfirmation,
   resetWorkspaceOverride,
+  setLaunchAtLogin,
+  setOperatorMode,
+  setWorkspacePinned,
   updateWorkspaceOverride
 } from './launcherService';
 import { createApplicationMenu, setEditMode } from './appMenu';
 import { initializeAutoUpdates } from './updates';
+import { getOperatorModeConfig } from './config';
+import {
+  beginProPresenterSession,
+  clearSessionState,
+  getSessionState
+} from './sessionController';
 
 const currentDir = dirname(fileURLToPath(import.meta.url));
 
-function createWindow(): void {
+async function createWindow(): Promise<void> {
+  const operatorMode = await getOperatorModeConfig();
   const mainWindow = new BrowserWindow({
-    width: 500,
-    height: 640,
-    minWidth: 440,
+    width: operatorMode ? 720 : 500,
+    height: operatorMode ? 760 : 640,
+    minWidth: operatorMode ? 560 : 440,
     minHeight: 560,
+    center: true,
     show: false,
     title: 'ProPresenter Splash',
     titleBarStyle: 'hiddenInset',
@@ -43,6 +57,11 @@ function createWindow(): void {
 
   mainWindow.on('ready-to-show', () => {
     mainWindow.show();
+    if (operatorMode) {
+      mainWindow.center();
+      mainWindow.focus();
+      app.focus({ steal: true });
+    }
   });
 
   mainWindow.webContents.once('did-finish-load', () => {
@@ -54,6 +73,23 @@ function createWindow(): void {
   } else {
     mainWindow.loadFile(join(currentDir, '../renderer/index.html'));
   }
+}
+
+function beginSessionAndHideWindow(
+  window: BrowserWindow | null,
+  result: LaunchResult,
+  fallbackWorkspaceId: string
+): void {
+  beginProPresenterSession(window, {
+    id: result.workspaceId ?? fallbackWorkspaceId,
+    name: result.workspaceName
+  });
+
+  setTimeout(() => {
+    if (window && !window.isDestroyed()) {
+      window.hide();
+    }
+  }, 700);
 }
 
 function runSmokeHooks(window: BrowserWindow): void {
@@ -137,25 +173,74 @@ app.whenReady().then(() => {
     setEditMode(Boolean(value), { notifyRenderer: false })
   );
 
+  ipcMain.handle('launcher:set-launch-at-login', (_event, value: boolean) =>
+    setLaunchAtLogin(Boolean(value))
+  );
+
+  ipcMain.handle('launcher:set-operator-mode', async (event, value: boolean) => {
+    const state = await setOperatorMode(Boolean(value));
+    if (value) {
+      const window = BrowserWindow.fromWebContents(event.sender);
+      window?.center();
+      window?.focus();
+      app.focus({ steal: true });
+    }
+    return state;
+  });
+
+  ipcMain.handle('launcher:set-workspace-pinned', (_event, key: string, pinned: boolean) =>
+    setWorkspacePinned(key, Boolean(pinned))
+  );
+
+  ipcMain.handle(
+    'launcher:move-workspace',
+    (_event, key: string, direction: WorkspaceOrderDirection) => moveWorkspace(key, direction)
+  );
+
+  ipcMain.handle('launcher:clear-session', () => clearSessionState());
+
+  ipcMain.handle('launcher:request-logout', () => requestLogoutConfirmation());
+
+  ipcMain.handle('launcher:reopen-last-workspace', async (event) => {
+    const session = getSessionState();
+    if (!session.lastWorkspaceId) {
+      return {
+        ok: false,
+        code: 'NO_SESSION_WORKSPACE',
+        message: 'There is no recent workspace to reopen.'
+      } satisfies LaunchResult;
+    }
+
+    const result: LaunchResult = await launchWorkspace(session.lastWorkspaceId);
+    if (result.ok) {
+      beginSessionAndHideWindow(
+        BrowserWindow.fromWebContents(event.sender),
+        result,
+        session.lastWorkspaceId
+      );
+    }
+
+    return result;
+  });
+
   ipcMain.handle(
     'launcher:launch-workspace',
     async (event, workspaceId: string, options?: LaunchWorkspaceOptions) => {
       const result: LaunchResult = await launchWorkspace(workspaceId, options);
       if (result.ok) {
-        const window = BrowserWindow.fromWebContents(event.sender);
-        setTimeout(() => window?.close(), 700);
+        beginSessionAndHideWindow(BrowserWindow.fromWebContents(event.sender), result, workspaceId);
       }
 
       return result;
     }
   );
 
-  createWindow();
+  void createWindow();
   initializeAutoUpdates();
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
-      createWindow();
+      void createWindow();
     }
   });
 });
