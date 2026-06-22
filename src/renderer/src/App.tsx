@@ -9,6 +9,7 @@ import {
   FolderOpen,
   Gear,
   IconContext,
+  Info,
   MonitorPlay,
   PencilSimple,
   Stack,
@@ -41,10 +42,12 @@ function App(): JSX.Element {
   const [confirmingWorkspace, setConfirmingWorkspace] = useState<Workspace | null>(null);
   const [retryWorkspace, setRetryWorkspace] = useState<Workspace | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [copyStatus, setCopyStatus] = useState<string | null>(null);
 
   const loadState = useCallback(async () => {
     setMessage(null);
+    setNotice(null);
     setCopyStatus(null);
     setLoadStatus('loading');
 
@@ -66,6 +69,7 @@ function App(): JSX.Element {
   async function handleRefresh(): Promise<void> {
     setRefreshing(true);
     setMessage(null);
+    setNotice(null);
     setCopyStatus(null);
     setRetryWorkspace(null);
 
@@ -84,6 +88,7 @@ function App(): JSX.Element {
   async function handleChooseFolder(): Promise<void> {
     setRefreshing(true);
     setMessage(null);
+    setNotice(null);
     setCopyStatus(null);
     setRetryWorkspace(null);
 
@@ -149,6 +154,7 @@ function App(): JSX.Element {
     patch: WorkspaceOverridePatch
   ): Promise<void> {
     setMessage(null);
+    setNotice(null);
     setCopyStatus(null);
     try {
       const nextState = await window.launcher.updateWorkspace(workspace.key, patch);
@@ -162,6 +168,7 @@ function App(): JSX.Element {
 
   async function handleResetWorkspace(workspace: Workspace): Promise<void> {
     setMessage(null);
+    setNotice(null);
     setCopyStatus(null);
     try {
       const nextState = await window.launcher.resetWorkspace(workspace.key);
@@ -186,6 +193,7 @@ function App(): JSX.Element {
           : `Opening “${workspace.name}”…`
     });
     setMessage(null);
+    setNotice(null);
     setCopyStatus(null);
     setRetryWorkspace(null);
 
@@ -204,7 +212,7 @@ function App(): JSX.Element {
         return;
       }
 
-      setMessage(result.message);
+      setNotice(result.message);
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error);
       setMessage(`Could not open ProPresenter. ${detail}`);
@@ -242,7 +250,7 @@ function App(): JSX.Element {
             </span>
             <span className="editBarHint">Rename or repoint workspaces</span>
             <button className="editBarDone" type="button" onClick={() => void handleExitEditMode()}>
-              Done
+              Exit
             </button>
           </div>
         ) : null}
@@ -276,6 +284,13 @@ function App(): JSX.Element {
                 <Clipboard size={15} />
                 Copy details
               </button>
+            </div>
+          ) : null}
+
+          {notice ? (
+            <div className="banner info" role="status">
+              <Info size={18} weight="fill" />
+              <span>{notice}</span>
             </div>
           ) : null}
 

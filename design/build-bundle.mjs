@@ -56,6 +56,7 @@ const I = {
   gear: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="1em" height="1em"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.5v2.6M12 18.9v2.6M21.5 12h-2.6M5.1 12H2.5M18.7 5.3l-1.8 1.8M7.1 16.9l-1.8 1.8M18.7 18.7l-1.8-1.8M7.1 7.1 5.3 5.3"/></svg>`,
   warnCircle: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" width="1em" height="1em"><circle cx="12" cy="12" r="9.2"/><path d="M12 7.5v5"/><circle cx="12" cy="16.4" r="1" fill="currentColor" stroke="none"/></svg>`,
   checkCircle: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" width="1em" height="1em"><circle cx="12" cy="12" r="9.2"/><path d="m8 12 2.8 2.8L16 9.2"/></svg>`,
+  info: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" width="1em" height="1em"><circle cx="12" cy="12" r="9.2"/><path d="M12 11.2v5.2"/><circle cx="12" cy="7.6" r="1" fill="currentColor" stroke="none"/></svg>`,
   warnTri: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" width="1em" height="1em"><path d="M12 3.2 1.8 20.5h20.4L12 3.2Z"/><path d="M12 9.5v5"/><circle cx="12" cy="17.6" r="1" fill="currentColor" stroke="none"/></svg>`,
   download: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" width="1em" height="1em"><path d="M12 3.5v11M7.5 10 12 14.5 16.5 10M4 20h16"/></svg>`,
   clipboard: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" width="1em" height="1em"><rect x="5" y="4.5" width="14" height="16" rx="2"/><path d="M9 4.5a3 3 0 0 1 6 0"/></svg>`,
@@ -166,6 +167,7 @@ const components = [
     body: () => `<div class="stage"><div class="alerts" style="display:grid">
       <div class="banner warn"><span>${I.warnCircle}</span><span>ProPresenter isn’t installed on this Mac.</span><button class="bannerBtn" type="button">${I.download} Download</button></div>
       <div class="banner error"><span>${I.warnCircle}</span><span>Could not open ProPresenter. Quit failed.</span><button class="bannerBtn" type="button">Retry</button><button class="bannerBtn" type="button">${I.clipboard} Copy details</button></div>
+      <div class="banner info"><span>${I.info}</span><span>Opening ProPresenter.</span></div>
       <div class="banner success"><span>${I.checkCircle}</span><span>Support details copied.</span></div>
     </div></div>`
   },
