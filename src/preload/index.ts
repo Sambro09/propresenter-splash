@@ -5,6 +5,8 @@ import type {
   LaunchResult,
   LaunchWorkspaceOptions,
   MenuAction,
+  SessionState,
+  WorkspaceOrderDirection,
   WorkspaceOverridePatch
 } from '../shared/types';
 
@@ -25,8 +27,27 @@ const api: LauncherApi = {
     ipcRenderer.invoke('launcher:reset-workspace', key) as Promise<LauncherState>,
   chooseDirectory: () =>
     ipcRenderer.invoke('launcher:choose-directory') as Promise<string | null>,
+  setLaunchAtLogin: (value: boolean) =>
+    ipcRenderer.invoke('launcher:set-launch-at-login', value) as Promise<LauncherState>,
+  setOperatorMode: (value: boolean) =>
+    ipcRenderer.invoke('launcher:set-operator-mode', value) as Promise<LauncherState>,
+  setWorkspacePinned: (key: string, pinned: boolean) =>
+    ipcRenderer.invoke('launcher:set-workspace-pinned', key, pinned) as Promise<LauncherState>,
+  moveWorkspace: (key: string, direction: WorkspaceOrderDirection) =>
+    ipcRenderer.invoke('launcher:move-workspace', key, direction) as Promise<LauncherState>,
+  clearSession: () =>
+    ipcRenderer.invoke('launcher:clear-session') as Promise<SessionState>,
+  reopenLastWorkspace: () =>
+    ipcRenderer.invoke('launcher:reopen-last-workspace') as Promise<LaunchResult>,
+  requestLogout: () =>
+    ipcRenderer.invoke('launcher:request-logout') as Promise<void>,
   setEditMode: (value: boolean) =>
     ipcRenderer.invoke('launcher:set-edit-mode', value) as Promise<boolean>,
+  onSessionState: (handler: (state: SessionState) => void) => {
+    const listener = (_event: IpcRendererEvent, state: SessionState): void => handler(state);
+    ipcRenderer.on('launcher:session-state', listener);
+    return () => ipcRenderer.removeListener('launcher:session-state', listener);
+  },
   onEditMode: (handler: (value: boolean) => void) => {
     const listener = (_event: IpcRendererEvent, value: boolean): void => handler(value);
     ipcRenderer.on('launcher:edit-mode', listener);

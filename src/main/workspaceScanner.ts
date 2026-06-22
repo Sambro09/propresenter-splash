@@ -1,7 +1,11 @@
 import { readdir, stat } from 'node:fs/promises';
 import { basename, join } from 'node:path';
 import type { Workspace } from '../shared/types';
-import { getWorkspaceOverrides, getWorkspaceRootConfig } from './config';
+import {
+  getWorkspaceDisplayConfig,
+  getWorkspaceOverrides,
+  getWorkspaceRootConfig
+} from './config';
 import { logError } from './logger';
 import {
   readActiveWorkspaceState,
@@ -26,7 +30,14 @@ function registryName(entry: WorkspaceRegistryEntry | undefined, fallbackPath: s
 export async function scanWorkspaces(): Promise<WorkspaceScanResult> {
   const errors: string[] = [];
   const { workspaceRoot, isCustomWorkspaceRoot } = await getWorkspaceRootConfig();
-  const overrides = await getWorkspaceOverrides();
+  const [overrides, displayConfig] = await Promise.all([
+    getWorkspaceOverrides(),
+    getWorkspaceDisplayConfig()
+  ]);
+  const pinnedKeys = new Set(displayConfig.pinnedWorkspaceKeys);
+  const orderIndex = new Map(
+    displayConfig.workspaceOrder.map((workspaceKey, index) => [workspaceKey, index])
+  );
   const directories = new Set<string>();
 
   let activeState = await readActiveWorkspaceState().catch((error: unknown) => {
@@ -91,11 +102,29 @@ export async function scanWorkspaces(): Promise<WorkspaceScanResult> {
         name,
         path: effectivePath,
         isActive: samePath(activeState.activePath, effectivePath),
+        isPinned: pinnedKeys.has(directoryPath),
         source: registryEntry ? 'registry' : 'folder',
         isCustomized: Boolean(override)
       };
     })
-    .sort((left, right) => left.name.localeCompare(right.name));
+    .sort((left, right) => {
+      const leftOrder = orderIndex.get(left.key);
+      const rightOrder = orderIndex.get(right.key);
+
+      if (leftOrder !== undefined && rightOrder !== undefined) {
+        return leftOrder - rightOrder;
+      }
+
+      if (leftOrder !== undefined) {
+        return -1;
+      }
+
+      if (rightOrder !== undefined) {
+        return 1;
+      }
+
+      return left.name.localeCompare(right.name);
+    });
 
   const activeWorkspace = workspaces.find((workspace) => workspace.isActive);
   const activeWorkspaceId =

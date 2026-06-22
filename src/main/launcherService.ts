@@ -1,15 +1,21 @@
-import { BrowserWindow, dialog, type OpenDialogOptions } from 'electron';
+import { app, BrowserWindow, dialog, type OpenDialogOptions } from 'electron';
 import { stat } from 'node:fs/promises';
 import type {
+  LauncherSettings,
   LauncherState,
   LaunchResult,
   LaunchWorkspaceOptions,
+  WorkspaceOrderDirection,
   WorkspaceOverridePatch
 } from '../shared/types';
 import { writeActiveWorkspace } from './activeWorkspace';
 import {
   clearWorkspaceOverride,
+  getOperatorModeConfig,
+  moveWorkspaceInOrderConfig,
   setCustomWorkspaceRoot,
+  setOperatorModeConfig,
+  setWorkspacePinnedConfig,
   setWorkspaceOverride
 } from './config';
 import { getSupportLogPath, logError, logInfo } from './logger';
@@ -22,12 +28,41 @@ import {
   locateProPresenter,
   quitProPresenterAndWait
 } from './proPresenterController';
+import { runCommand } from './shell';
+import { getSessionState } from './sessionController';
+
+function loginItemAvailable(): boolean {
+  return process.platform === 'darwin';
+}
+
+function getLaunchAtLogin(): boolean {
+  if (!loginItemAvailable()) {
+    return false;
+  }
+
+  try {
+    return app.getLoginItemSettings().openAtLogin;
+  } catch (error) {
+    void logError('Could not read Login Item settings', error);
+    return false;
+  }
+}
+
+async function getLauncherSettings(): Promise<LauncherSettings> {
+  const operatorMode = await getOperatorModeConfig();
+  return {
+    launchAtLogin: getLaunchAtLogin(),
+    launchAtLoginAvailable: loginItemAvailable(),
+    operatorMode
+  };
+}
 
 export async function getLauncherState(): Promise<LauncherState> {
-  const [scan, appPath, running] = await Promise.all([
+  const [scan, appPath, running, settings] = await Promise.all([
     scanWorkspaces(),
     locateProPresenter(),
-    isProPresenterRunning()
+    isProPresenterRunning(),
+    getLauncherSettings()
   ]);
 
   return {
@@ -37,7 +72,9 @@ export async function getLauncherState(): Promise<LauncherState> {
       installed: Boolean(appPath),
       running,
       appPath
-    }
+    },
+    settings,
+    session: getSessionState()
   };
 }
 
@@ -111,6 +148,65 @@ export async function resetWorkspaceOverride(key: string): Promise<LauncherState
   return getLauncherState();
 }
 
+export async function setLaunchAtLogin(value: boolean): Promise<LauncherState> {
+  if (!loginItemAvailable()) {
+    throw new Error('Login Item registration is only available on macOS.');
+  }
+
+  app.setLoginItemSettings({
+    openAtLogin: value,
+    openAsHidden: false
+  });
+
+  await logInfo('Launcher Login Item setting changed', { openAtLogin: value });
+  return getLauncherState();
+}
+
+export async function setOperatorMode(value: boolean): Promise<LauncherState> {
+  await setOperatorModeConfig(value);
+  await logInfo('Operator startup mode changed', { operatorMode: value });
+  return getLauncherState();
+}
+
+export async function setWorkspacePinned(
+  key: string,
+  pinned: boolean
+): Promise<LauncherState> {
+  const scan = await scanWorkspaces();
+  await setWorkspacePinnedConfig(
+    key,
+    pinned,
+    scan.workspaces.map((workspace) => workspace.key)
+  );
+  await logInfo('Workspace pin changed', { key, pinned });
+  return getLauncherState();
+}
+
+export async function moveWorkspace(
+  key: string,
+  direction: WorkspaceOrderDirection
+): Promise<LauncherState> {
+  const scan = await scanWorkspaces();
+  await moveWorkspaceInOrderConfig(
+    key,
+    direction,
+    scan.workspaces.map((workspace) => workspace.key)
+  );
+  await logInfo('Workspace order changed', { key, direction });
+  return getLauncherState();
+}
+
+export async function requestLogoutConfirmation(): Promise<void> {
+  if (process.platform !== 'darwin') {
+    throw new Error('Logout handoff is only available on macOS.');
+  }
+
+  await logInfo('Requesting macOS logout confirmation');
+  await runCommand('osascript', ['-e', 'tell application "System Events" to log out'], {
+    timeout: 8_000
+  });
+}
+
 export async function launchWorkspace(
   workspaceId: string,
   options: LaunchWorkspaceOptions = {}
@@ -151,6 +247,8 @@ export async function launchWorkspace(
       await logInfo('Focused already-active ProPresenter workspace', { targetPath });
       return {
         ok: true,
+        workspaceId: targetPath,
+        workspaceName: targetWorkspace?.name,
         message: 'Bringing ProPresenter to the front.'
       };
     } catch (error) {
@@ -169,6 +267,8 @@ export async function launchWorkspace(
       ok: false,
       code: 'CONFIRM_QUIT_REQUIRED',
       requiresConfirmation: true,
+      workspaceId: targetPath,
+      workspaceName: targetWorkspace?.name,
       message: `ProPresenter is open. Save any work first, then confirm switching to "${targetWorkspace?.name ?? 'this workspace'}".`
     };
   }
@@ -216,6 +316,8 @@ export async function launchWorkspace(
 
   return {
     ok: true,
+    workspaceId: targetPath,
+    workspaceName: targetWorkspace?.name,
     message: 'Opening ProPresenter.'
   };
 }

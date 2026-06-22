@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  ArrowDown,
+  ArrowUp,
   CaretRight,
   Check,
   CheckCircle,
@@ -12,6 +14,8 @@ import {
   Info,
   MonitorPlay,
   PencilSimple,
+  PushPin,
+  SignOut,
   Stack,
   Warning,
   WarningCircle
@@ -19,7 +23,9 @@ import {
 import type {
   LauncherState,
   LaunchWorkspaceOptions,
+  SessionState,
   Workspace,
+  WorkspaceOrderDirection,
   WorkspaceOverridePatch
 } from '../../shared/types';
 
@@ -41,6 +47,10 @@ function App(): JSX.Element {
   const [launching, setLaunching] = useState<LaunchingState | null>(null);
   const [confirmingWorkspace, setConfirmingWorkspace] = useState<Workspace | null>(null);
   const [retryWorkspace, setRetryWorkspace] = useState<Workspace | null>(null);
+  const [sessionState, setSessionState] = useState<SessionState>({ status: 'idle' });
+  const [sessionAction, setSessionAction] = useState<
+    'logout' | 'choose' | 'reopen' | null
+  >(null);
   const [message, setMessage] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [copyStatus, setCopyStatus] = useState<string | null>(null);
@@ -54,6 +64,7 @@ function App(): JSX.Element {
     try {
       const nextState = await window.launcher.getState();
       setLauncherState(nextState);
+      setSessionState(nextState.session);
       setLoadStatus('ready');
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error);
@@ -76,6 +87,7 @@ function App(): JSX.Element {
     try {
       const nextState = await window.launcher.rescan();
       setLauncherState(nextState);
+      setSessionState(nextState.session);
       setLoadStatus('ready');
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error);
@@ -95,6 +107,7 @@ function App(): JSX.Element {
     try {
       const nextState = await window.launcher.chooseWorkspacesFolder();
       setLauncherState(nextState);
+      setSessionState(nextState.session);
       setLoadStatus('ready');
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error);
@@ -122,6 +135,17 @@ function App(): JSX.Element {
       offEdit();
     };
   }, []);
+
+  useEffect(() => {
+    const offSession = window.launcher.onSessionState((state) => {
+      setSessionState(state);
+      if (state.status === 'ended') {
+        void loadState();
+      }
+    });
+
+    return () => offSession();
+  }, [loadState]);
 
   const supportDetails = useMemo(
     () => buildSupportDetails(launcherState, message),
@@ -180,6 +204,124 @@ function App(): JSX.Element {
     }
   }
 
+  async function handleSetLaunchAtLogin(value: boolean): Promise<void> {
+    setMessage(null);
+    setNotice(null);
+    setCopyStatus(null);
+    try {
+      const nextState = await window.launcher.setLaunchAtLogin(value);
+      setLauncherState(nextState);
+      setSessionState(nextState.session);
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      setMessage(`Could not change the Login Item setting. ${detail}`);
+    }
+  }
+
+  async function handleSetOperatorMode(value: boolean): Promise<void> {
+    setMessage(null);
+    setNotice(null);
+    setCopyStatus(null);
+    try {
+      const nextState = await window.launcher.setOperatorMode(value);
+      setLauncherState(nextState);
+      setSessionState(nextState.session);
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      setMessage(`Could not change operator startup mode. ${detail}`);
+    }
+  }
+
+  async function handleSetWorkspacePinned(workspace: Workspace, pinned: boolean): Promise<void> {
+    setMessage(null);
+    setNotice(null);
+    setCopyStatus(null);
+    try {
+      const nextState = await window.launcher.setWorkspacePinned(workspace.key, pinned);
+      setLauncherState(nextState);
+      setSessionState(nextState.session);
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      setMessage(`Could not update workspace pinning. ${detail}`);
+    }
+  }
+
+  async function handleMoveWorkspace(
+    workspace: Workspace,
+    direction: WorkspaceOrderDirection
+  ): Promise<void> {
+    setMessage(null);
+    setNotice(null);
+    setCopyStatus(null);
+    try {
+      const nextState = await window.launcher.moveWorkspace(workspace.key, direction);
+      setLauncherState(nextState);
+      setSessionState(nextState.session);
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      setMessage(`Could not update workspace order. ${detail}`);
+    }
+  }
+
+  async function handleChooseAnotherWorkspace(): Promise<void> {
+    setSessionAction('choose');
+    setMessage(null);
+    setNotice(null);
+    setCopyStatus(null);
+    try {
+      const nextSession = await window.launcher.clearSession();
+      setSessionState(nextSession);
+      await loadState();
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      setMessage(`Could not return to workspace selection. ${detail}`);
+    } finally {
+      setSessionAction(null);
+    }
+  }
+
+  async function handleReopenLastWorkspace(): Promise<void> {
+    setSessionAction('reopen');
+    setMessage(null);
+    setNotice(null);
+    setCopyStatus(null);
+    try {
+      const result = await window.launcher.reopenLastWorkspace();
+      if (!result.ok) {
+        setMessage(result.message);
+        return;
+      }
+
+      setSessionState({
+        status: 'running',
+        lastWorkspaceId: result.workspaceId,
+        lastWorkspaceName: result.workspaceName
+      });
+      setNotice(result.message);
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      setMessage(`Could not reopen ProPresenter. ${detail}`);
+    } finally {
+      setSessionAction(null);
+    }
+  }
+
+  async function handleRequestLogout(): Promise<void> {
+    setSessionAction('logout');
+    setMessage(null);
+    setNotice(null);
+    setCopyStatus(null);
+    try {
+      await window.launcher.requestLogout();
+      setNotice('macOS logout confirmation opened.');
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      setMessage(`Could not open the macOS logout confirmation. ${detail}`);
+    } finally {
+      setSessionAction(null);
+    }
+  }
+
   async function handleLaunch(
     workspace: Workspace,
     options: LaunchWorkspaceOptions = {}
@@ -213,6 +355,11 @@ function App(): JSX.Element {
       }
 
       setNotice(result.message);
+      setSessionState({
+        status: 'running',
+        lastWorkspaceId: result.workspaceId ?? workspace.id,
+        lastWorkspaceName: result.workspaceName ?? workspace.name
+      });
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error);
       setMessage(`Could not open ProPresenter. ${detail}`);
@@ -230,6 +377,8 @@ function App(): JSX.Element {
     setConfirmingWorkspace(null);
     await handleLaunch(workspace, { confirmQuit: true });
   }
+
+  const showSessionEnded = sessionState.status === 'ended';
 
   return (
     <IconContext.Provider value={ICON_DEFAULTS}>
@@ -253,6 +402,17 @@ function App(): JSX.Element {
               Exit
             </button>
           </div>
+        ) : null}
+
+        {editMode && launcherState && !showSessionEnded ? (
+          <AdminPanel
+            launcherState={launcherState}
+            refreshing={refreshing}
+            onSetLaunchAtLogin={handleSetLaunchAtLogin}
+            onSetOperatorMode={handleSetOperatorMode}
+            onRefresh={handleRefresh}
+            onChooseFolder={handleChooseFolder}
+          />
         ) : null}
 
         <div className="alerts">
@@ -305,13 +465,24 @@ function App(): JSX.Element {
         <main className="library" aria-live="polite">
           {loadStatus === 'loading' ? <LoadingState /> : null}
           {loadStatus === 'error' ? <ErrorState /> : null}
-          {loadStatus === 'ready' && launcherState ? (
+          {loadStatus === 'ready' && launcherState && showSessionEnded ? (
+            <SessionEndedScreen
+              session={sessionState}
+              busyAction={sessionAction}
+              onLogout={handleRequestLogout}
+              onChooseAnother={handleChooseAnotherWorkspace}
+              onReopenLast={handleReopenLastWorkspace}
+            />
+          ) : null}
+          {loadStatus === 'ready' && launcherState && !showSessionEnded ? (
             <WorkspaceLibrary
               launcherState={launcherState}
               launching={launching}
               editMode={editMode}
               onLaunch={handleLaunch}
               onEdit={setEditingWorkspace}
+              onPin={handleSetWorkspacePinned}
+              onMove={handleMoveWorkspace}
               onChooseFolder={handleChooseFolder}
               onCopyDetails={handleCopyDetails}
             />
@@ -340,12 +511,143 @@ function App(): JSX.Element {
   );
 }
 
+function AdminPanel({
+  launcherState,
+  refreshing,
+  onSetLaunchAtLogin,
+  onSetOperatorMode,
+  onRefresh,
+  onChooseFolder
+}: {
+  launcherState: LauncherState;
+  refreshing: boolean;
+  onSetLaunchAtLogin: (value: boolean) => Promise<void>;
+  onSetOperatorMode: (value: boolean) => Promise<void>;
+  onRefresh: () => Promise<void>;
+  onChooseFolder: () => Promise<void>;
+}): JSX.Element {
+  return (
+    <section className="adminPanel" aria-label="Admin setup">
+      <label className="toggleRow">
+        <input
+          type="checkbox"
+          checked={launcherState.settings.launchAtLogin}
+          disabled={!launcherState.settings.launchAtLoginAvailable}
+          onChange={(event) => void onSetLaunchAtLogin(event.currentTarget.checked)}
+        />
+        <span>
+          <strong>Launch at login</strong>
+          <small>Register this launcher as the shared account Login Item.</small>
+        </span>
+      </label>
+
+      <label className="toggleRow">
+        <input
+          type="checkbox"
+          checked={launcherState.settings.operatorMode}
+          onChange={(event) => void onSetOperatorMode(event.currentTarget.checked)}
+        />
+        <span>
+          <strong>Focused startup mode</strong>
+          <small>Open centered and focused when the operator logs in.</small>
+        </span>
+      </label>
+
+      <div className="adminActions">
+        <button
+          className="adminBtn"
+          type="button"
+          onClick={() => void onRefresh()}
+          disabled={refreshing}
+        >
+          {refreshing ? <CircleNotch size={15} className="spin" /> : <Stack size={15} />}
+          Rescan
+        </button>
+        <button className="adminBtn" type="button" onClick={() => void onChooseFolder()}>
+          <FolderOpen size={15} />
+          Choose Folder
+        </button>
+      </div>
+    </section>
+  );
+}
+
+function SessionEndedScreen({
+  session,
+  busyAction,
+  onLogout,
+  onChooseAnother,
+  onReopenLast
+}: {
+  session: SessionState;
+  busyAction: 'logout' | 'choose' | 'reopen' | null;
+  onLogout: () => Promise<void>;
+  onChooseAnother: () => Promise<void>;
+  onReopenLast: () => Promise<void>;
+}): JSX.Element {
+  const workspaceName = session.lastWorkspaceName ?? 'Last Workspace';
+
+  return (
+    <section className="sessionScreen">
+      <div className="sessionIcon" aria-hidden="true">
+        <CheckCircle size={34} weight="fill" />
+      </div>
+      <h2>ProPresenter Closed</h2>
+      <p>{workspaceName}</p>
+
+      <div className="sessionActions">
+        <button
+          className="sessionBtn primary"
+          type="button"
+          onClick={() => void onLogout()}
+          disabled={Boolean(busyAction)}
+        >
+          {busyAction === 'logout' ? (
+            <CircleNotch size={18} className="spin" />
+          ) : (
+            <SignOut size={18} />
+          )}
+          Log Out
+        </button>
+        <button
+          className="sessionBtn"
+          type="button"
+          onClick={() => void onChooseAnother()}
+          disabled={Boolean(busyAction)}
+        >
+          {busyAction === 'choose' ? (
+            <CircleNotch size={18} className="spin" />
+          ) : (
+            <Stack size={18} />
+          )}
+          Choose Another Workspace
+        </button>
+        <button
+          className="sessionBtn"
+          type="button"
+          onClick={() => void onReopenLast()}
+          disabled={Boolean(busyAction) || !session.lastWorkspaceId}
+        >
+          {busyAction === 'reopen' ? (
+            <CircleNotch size={18} className="spin" />
+          ) : (
+            <MonitorPlay size={18} />
+          )}
+          Reopen Last Workspace
+        </button>
+      </div>
+    </section>
+  );
+}
+
 function WorkspaceLibrary({
   launcherState,
   launching,
   editMode,
   onLaunch,
   onEdit,
+  onPin,
+  onMove,
   onChooseFolder,
   onCopyDetails
 }: {
@@ -354,6 +656,8 @@ function WorkspaceLibrary({
   editMode: boolean;
   onLaunch: (workspace: Workspace) => Promise<void>;
   onEdit: (workspace: Workspace) => void;
+  onPin: (workspace: Workspace, pinned: boolean) => Promise<void>;
+  onMove: (workspace: Workspace, direction: WorkspaceOrderDirection) => Promise<void>;
   onChooseFolder: () => Promise<void>;
   onCopyDetails: () => Promise<void>;
 }): JSX.Element {
@@ -378,7 +682,7 @@ function WorkspaceLibrary({
   return (
     <>
       <div className="list">
-        {launcherState.workspaces.map((workspace) => {
+        {launcherState.workspaces.map((workspace, index) => {
           const isLaunching = launching?.workspaceId === workspace.id;
           return (
             <div className="wsRowWrap" key={workspace.key}>
@@ -415,15 +719,50 @@ function WorkspaceLibrary({
               </button>
 
               {editMode ? (
-                <button
-                  className="wsGear"
-                  type="button"
-                  title={`Edit “${workspace.name}”`}
-                  aria-label={`Edit ${workspace.name}`}
-                  onClick={() => onEdit(workspace)}
-                >
-                  <Gear size={18} />
-                </button>
+                <div className="wsTools">
+                  <button
+                    className={`wsTool${workspace.isPinned ? ' active' : ''}`}
+                    type="button"
+                    title={workspace.isPinned ? `Unpin ${workspace.name}` : `Pin ${workspace.name}`}
+                    aria-label={
+                      workspace.isPinned ? `Unpin ${workspace.name}` : `Pin ${workspace.name}`
+                    }
+                    onClick={() => void onPin(workspace, !workspace.isPinned)}
+                    disabled={Boolean(launching)}
+                  >
+                    <PushPin size={17} weight={workspace.isPinned ? 'fill' : 'regular'} />
+                  </button>
+                  <button
+                    className="wsTool"
+                    type="button"
+                    title={`Move ${workspace.name} up`}
+                    aria-label={`Move ${workspace.name} up`}
+                    onClick={() => void onMove(workspace, 'up')}
+                    disabled={Boolean(launching) || index === 0}
+                  >
+                    <ArrowUp size={17} />
+                  </button>
+                  <button
+                    className="wsTool"
+                    type="button"
+                    title={`Move ${workspace.name} down`}
+                    aria-label={`Move ${workspace.name} down`}
+                    onClick={() => void onMove(workspace, 'down')}
+                    disabled={Boolean(launching) || index === launcherState.workspaces.length - 1}
+                  >
+                    <ArrowDown size={17} />
+                  </button>
+                  <button
+                    className="wsTool"
+                    type="button"
+                    title={`Edit ${workspace.name}`}
+                    aria-label={`Edit ${workspace.name}`}
+                    onClick={() => onEdit(workspace)}
+                    disabled={Boolean(launching)}
+                  >
+                    <Gear size={17} />
+                  </button>
+                </div>
               ) : null}
             </div>
           );
@@ -629,6 +968,9 @@ function buildSupportDetails(state: LauncherState | null, message: string | null
     `ProPresenter installed: ${state?.proPresenter.installed ? 'yes' : 'no'}`,
     `ProPresenter running: ${state?.proPresenter.running ? 'yes' : 'no'}`,
     `ProPresenter path: ${state?.proPresenter.appPath ?? 'unknown'}`,
+    `Launch at login: ${state?.settings.launchAtLogin ? 'yes' : 'no'}`,
+    `Operator mode: ${state?.settings.operatorMode ? 'yes' : 'no'}`,
+    `Session: ${state?.session.status ?? 'unknown'}`,
     `Support log: ${state?.supportLogPath ?? 'unknown'}`,
     '',
     'Errors:',
@@ -638,7 +980,7 @@ function buildSupportDetails(state: LauncherState | null, message: string | null
     ...(state?.workspaces.length
       ? state.workspaces.map(
           (workspace) =>
-            `- ${workspace.isActive ? '[active] ' : ''}${workspace.name}${workspace.isCustomized ? ' (custom)' : ''} (${workspace.source}): ${workspace.path}`
+            `- ${workspace.isActive ? '[active] ' : ''}${workspace.isPinned ? '[pinned] ' : ''}${workspace.name}${workspace.isCustomized ? ' (custom)' : ''} (${workspace.source}): ${workspace.path}`
         )
       : ['- none'])
   ];

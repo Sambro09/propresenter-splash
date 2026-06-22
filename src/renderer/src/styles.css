@@ -171,6 +171,93 @@ button {
   background: #eaf1ff;
 }
 
+/* ---------- Admin setup ---------- */
+.adminPanel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--toolbar-border);
+  background: #202124;
+}
+
+.toggleRow {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  gap: 9px;
+  align-items: center;
+  min-width: 0;
+  color: var(--text);
+  font-size: 12px;
+}
+
+.toggleRow input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+.toggleRow input:disabled {
+  opacity: 0.45;
+}
+
+.toggleRow span {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+.toggleRow strong,
+.toggleRow small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.toggleRow strong {
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.toggleRow small {
+  color: var(--text-3);
+  font-size: 11px;
+}
+
+.adminActions {
+  display: flex;
+  gap: 7px;
+  justify-content: flex-end;
+}
+
+.adminBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.05);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+
+.adminBtn:hover:not(:disabled) {
+  border-color: #4a4a52;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.adminBtn:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
 /* ---------- Alerts area ---------- */
 .alerts {
   display: grid;
@@ -323,18 +410,23 @@ button {
 }
 
 .wsRow.editing {
-  padding-right: 52px;
+  padding-right: 178px;
 }
 
-.wsGear {
+.wsTools {
   position: absolute;
   top: 50%;
   right: 10px;
+  display: flex;
+  gap: 6px;
+  transform: translateY(-50%);
+}
+
+.wsTool {
   display: grid;
   width: 32px;
   height: 32px;
   place-items: center;
-  transform: translateY(-50%);
   border: 1px solid var(--border);
   border-radius: 8px;
   color: var(--text-2);
@@ -343,10 +435,21 @@ button {
   transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
 }
 
-.wsGear:hover {
+.wsTool:hover:not(:disabled) {
   border-color: #4a4a52;
   color: var(--text);
   background: rgba(255, 255, 255, 0.12);
+}
+
+.wsTool.active {
+  border-color: rgba(47, 123, 246, 0.65);
+  color: #ffffff;
+  background: rgba(47, 123, 246, 0.22);
+}
+
+.wsTool:disabled {
+  cursor: default;
+  opacity: 0.42;
 }
 
 .wsRow.active {
@@ -523,6 +626,89 @@ button {
 
 .detailsBox p + p {
   margin-top: 6px;
+}
+
+/* ---------- Session end ---------- */
+.sessionScreen {
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 12px;
+  height: 100%;
+  padding: 32px;
+  text-align: center;
+}
+
+.sessionIcon {
+  display: grid;
+  width: 64px;
+  height: 64px;
+  place-items: center;
+  border-radius: 16px;
+  color: #ffffff;
+  background: #178a42;
+  box-shadow: 0 16px 48px rgba(23, 138, 66, 0.22);
+}
+
+.sessionScreen h2 {
+  margin: 4px 0 0;
+  color: var(--text);
+  font-size: 20px;
+  font-weight: 650;
+}
+
+.sessionScreen p {
+  max-width: 360px;
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: var(--text-2);
+  font-size: 13px;
+}
+
+.sessionActions {
+  display: grid;
+  gap: 9px;
+  width: min(100%, 340px);
+  margin-top: 12px;
+}
+
+.sessionBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 42px;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.05);
+  font-size: 13px;
+  font-weight: 650;
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease, filter 120ms ease;
+}
+
+.sessionBtn.primary {
+  border-color: var(--accent-strong);
+  color: #ffffff;
+  background: linear-gradient(180deg, #3380f7, var(--accent-strong));
+}
+
+.sessionBtn:hover:not(:disabled) {
+  border-color: #4a4a52;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.sessionBtn.primary:hover:not(:disabled) {
+  border-color: var(--accent-strong);
+  background: linear-gradient(180deg, #3e87f8, #2a74f2);
+  filter: brightness(1.04);
+}
+
+.sessionBtn:disabled {
+  cursor: default;
+  opacity: 0.6;
 }
 
 /* ---------- Modal ---------- */
@@ -729,6 +915,36 @@ button {
 .chooseBtn:hover {
   border-color: #4a4a52;
   background: rgba(255, 255, 255, 0.1);
+}
+
+@media (max-width: 640px) {
+  .adminPanel {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .adminActions {
+    justify-content: stretch;
+  }
+
+  .adminBtn {
+    flex: 1;
+    justify-content: center;
+  }
+
+  .wsRow.editing {
+    grid-template-columns: 34px minmax(0, 1fr);
+    padding-right: 13px;
+    padding-bottom: 52px;
+  }
+
+  .wsTools {
+    left: 60px;
+    right: auto;
+    top: auto;
+    bottom: 10px;
+    transform: none;
+  }
 }
 
 /* ---------- Focus + motion ---------- */
