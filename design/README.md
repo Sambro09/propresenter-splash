@@ -31,7 +31,7 @@ Then re-sync with the DesignSync tool (ask Claude: "sync the design bundle"):
 | Components  | Toolbar + status             |
 | Components  | Workspace rows (all states)  |
 | Components  | Buttons                      |
-| Components  | Banners (warn/error/success) |
+| Components  | Banners (warn/error/info/success) |
 | Components  | Edit-mode bar                |
 | Components  | Confirm switch dialog        |
 | Components  | Workspace editor dialog      |
