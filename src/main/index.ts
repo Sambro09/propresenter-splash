@@ -35,6 +35,34 @@ import {
 
 const currentDir = dirname(fileURLToPath(import.meta.url));
 
+/**
+ * Bring the window to the front and grab focus.
+ *
+ * macOS suppresses focus-stealing for apps launched in the background (e.g. login
+ * items started during login), so a plain `app.focus()` is ignored in that context.
+ * The brief `alwaysOnTop` pulse forces the window above others even while focus is
+ * suppressed, then we drop back to normal stacking once it is frontmost.
+ */
+function raiseToFront(window: BrowserWindow): void {
+  if (window.isDestroyed()) {
+    return;
+  }
+  if (window.isMinimized()) {
+    window.restore();
+  }
+  window.show();
+  window.center();
+  window.setAlwaysOnTop(true);
+  window.focus();
+  app.focus({ steal: true });
+  app.dock?.show();
+  setTimeout(() => {
+    if (!window.isDestroyed()) {
+      window.setAlwaysOnTop(false);
+    }
+  }, 1_000);
+}
+
 async function createWindow(): Promise<void> {
   const operatorMode = await getOperatorModeConfig();
   const mainWindow = new BrowserWindow({
@@ -58,9 +86,10 @@ async function createWindow(): Promise<void> {
   mainWindow.on('ready-to-show', () => {
     mainWindow.show();
     if (operatorMode) {
-      mainWindow.center();
-      mainWindow.focus();
-      app.focus({ steal: true });
+      raiseToFront(mainWindow);
+      // `ready-to-show` often fires before the window server will honor an
+      // activation during the login storm — retry once after it settles.
+      setTimeout(() => raiseToFront(mainWindow), 1_500);
     }
   });
 
@@ -181,9 +210,9 @@ app.whenReady().then(() => {
     const state = await setOperatorMode(Boolean(value));
     if (value) {
       const window = BrowserWindow.fromWebContents(event.sender);
-      window?.center();
-      window?.focus();
-      app.focus({ steal: true });
+      if (window) {
+        raiseToFront(window);
+      }
     }
     return state;
   });
