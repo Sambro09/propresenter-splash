@@ -26,6 +26,19 @@ For each tested ProPresenter/macOS combination:
 8. Test a relocated `UserWorkspaces` folder through **Choose folder**.
 9. Build a signed/notarized artifact and verify `codesign`, `spctl`, and `stapler`.
 
+## Operator Workflow Test
+
+Run this before installing on a shared presentation Mac:
+
+1. Add the launcher as a Login Item for the shared presentation account.
+2. Remove ProPresenter and unrelated apps from Login Items.
+3. Log out of macOS, then log back in as the shared presentation user.
+4. Verify the launcher appears first and ProPresenter does not open before workspace selection.
+5. Select each common service workspace and verify ProPresenter opens in the selected workspace.
+6. Quit ProPresenter and verify the operator has a clear path to log out or choose another
+   workspace.
+7. Reboot the Mac and verify the same first-screen behavior after login.
+
 ## Update Feed Test
 
 Before enabling broad public updates:
