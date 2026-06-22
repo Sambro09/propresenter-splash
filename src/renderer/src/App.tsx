@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   CaretRight,
+  Check,
   CheckCircle,
   CircleNotch,
   Clipboard,
@@ -227,17 +228,10 @@ function App(): JSX.Element {
       <div className="app">
         <header className="toolbar">
           <div className="toolbarTitle">
-            <span className="toolbarGlyph" aria-hidden="true">
-              <Stack size={19} />
-            </span>
             <span className="toolbarText">
               <span className="toolbarHeading">Workspaces</span>
-              <span className="toolbarSub">
-                Current: <b>{launcherState?.activeWorkspaceName ?? 'None selected'}</b>
-              </span>
             </span>
           </div>
-          <ProPresenterStatus state={launcherState} />
         </header>
 
         {editMode ? (
@@ -331,35 +325,6 @@ function App(): JSX.Element {
   );
 }
 
-function ProPresenterStatus({ state }: { state: LauncherState | null }): JSX.Element {
-  let dotClass = 'statusDot';
-  let label = 'Checking…';
-  let title = 'Checking ProPresenter…';
-
-  if (state) {
-    if (!state.proPresenter.installed) {
-      dotClass = 'statusDot missing';
-      label = 'Not installed';
-      title = 'ProPresenter is not installed';
-    } else if (state.proPresenter.running) {
-      dotClass = 'statusDot live';
-      label = 'Open';
-      title = 'ProPresenter is open';
-    } else {
-      dotClass = 'statusDot off';
-      label = 'Closed';
-      title = 'ProPresenter is closed';
-    }
-  }
-
-  return (
-    <span className="ppStatus" title={title}>
-      <span className={dotClass} aria-hidden="true" />
-      {label}
-    </span>
-  );
-}
-
 function WorkspaceLibrary({
   launcherState,
   launching,
@@ -397,11 +362,6 @@ function WorkspaceLibrary({
 
   return (
     <>
-      <div className="libraryHeader">
-        <span>Workspaces</span>
-        <span className="libraryCount">{launcherState.workspaces.length}</span>
-      </div>
-
       <div className="list">
         {launcherState.workspaces.map((workspace) => {
           const isLaunching = launching?.workspaceId === workspace.id;
@@ -417,7 +377,7 @@ function WorkspaceLibrary({
                   {isLaunching ? (
                     <CircleNotch size={22} className="spin" />
                   ) : (
-                    <MonitorPlay size={22} weight={workspace.isActive ? 'fill' : 'regular'} />
+                    <MonitorPlay size={22} weight="regular" />
                   )}
                 </span>
                 <span className="wsText">
@@ -429,9 +389,8 @@ function WorkspaceLibrary({
                   ) : null}
                 </span>
                 {workspace.isActive ? (
-                  <span className="activePill">
-                    <span className="activeDot" aria-hidden="true" />
-                    Active
+                  <span className="wsTrail wsCheck" aria-hidden="true">
+                    <Check size={19} weight="bold" />
                   </span>
                 ) : !editMode ? (
                   <span className="wsTrail" aria-hidden="true">

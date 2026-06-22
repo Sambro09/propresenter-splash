@@ -106,18 +106,6 @@ button {
   min-width: 0;
 }
 
-.toolbarGlyph {
-  display: grid;
-  width: 34px;
-  height: 34px;
-  flex: 0 0 34px;
-  place-items: center;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 9px;
-  color: #cfd6e6;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02));
-}
-
 .toolbarText {
   display: grid;
   gap: 1px;
@@ -129,36 +117,6 @@ button {
   font-size: 14px;
   font-weight: 600;
   letter-spacing: 0.1px;
-}
-
-.toolbarSub {
-  overflow: hidden;
-  color: var(--text-2);
-  font-size: 12px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.toolbarSub b {
-  color: #d7dbe6;
-  font-weight: 600;
-}
-
-/* ProPresenter run state, top-right where the toolbar icons used to live. */
-.ppStatus {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  margin-left: auto;
-  padding: 5px 11px 5px 9px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 999px;
-  color: var(--text-2);
-  background: rgba(0, 0, 0, 0.22);
-  font-size: 12px;
-  font-weight: 500;
-  white-space: nowrap;
-  -webkit-app-region: no-drag;
 }
 
 /* ---------- Edit-mode bar ---------- */
@@ -239,23 +197,23 @@ button {
 }
 
 .banner.warn {
-  border-color: rgba(255, 159, 10, 0.4);
-  color: #ffce86;
-  background: rgba(255, 159, 10, 0.12);
+  border-color: rgba(0, 0, 0, 0.16);
+  color: #2a1c00;
+  background: #f5a516;
 }
 
 .banner.error {
   grid-template-columns: 18px minmax(0, 1fr) auto auto;
   align-items: start;
-  border-color: rgba(255, 77, 62, 0.42);
-  color: #ff9d92;
-  background: rgba(255, 77, 62, 0.12);
+  border-color: rgba(0, 0, 0, 0.18);
+  color: #ffffff;
+  background: #d23b2d;
 }
 
 .banner.success {
-  border-color: rgba(53, 199, 89, 0.42);
-  color: #84e6a3;
-  background: rgba(53, 199, 89, 0.12);
+  border-color: rgba(0, 0, 0, 0.16);
+  color: #ffffff;
+  background: #178a42;
 }
 
 .bannerBtn {
@@ -278,51 +236,37 @@ button {
   background: rgba(255, 255, 255, 0.12);
 }
 
+/* On solid banners, buttons drop their border for a flat translucent look. */
+.banner.warn .bannerBtn,
+.banner.error .bannerBtn,
+.banner.success .bannerBtn {
+  border: none;
+  background: rgba(0, 0, 0, 0.16);
+}
+
+.banner.warn .bannerBtn:hover:not(:disabled),
+.banner.error .bannerBtn:hover:not(:disabled),
+.banner.success .bannerBtn:hover:not(:disabled) {
+  border: none;
+  background: rgba(0, 0, 0, 0.26);
+}
+
 /* ---------- Library ---------- */
 .library {
-  display: grid;
-  grid-template-rows: auto 1fr;
+  display: flex;
+  flex-direction: column;
   flex: 1;
   min-height: 0;
-}
-
-.libraryHeader {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 14px 18px 8px;
-}
-
-.libraryHeader span {
-  color: var(--text-3);
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.8px;
-  text-transform: uppercase;
-}
-
-.libraryCount {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 20px;
-  height: 18px;
-  padding: 0 6px;
-  border-radius: 999px;
-  color: var(--text-2) !important;
-  background: rgba(255, 255, 255, 0.08);
-  font-size: 11px !important;
-  font-weight: 600 !important;
-  letter-spacing: 0 !important;
 }
 
 .list {
   display: flex;
   flex-direction: column;
   gap: 6px;
+  flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: 2px 12px 14px;
+  padding: 22px 12px 14px;
 }
 
 .wsRow {
@@ -447,6 +391,10 @@ button {
   color: rgba(255, 255, 255, 0.78);
 }
 
+.wsRow.active .wsTrail {
+  color: #ffffff;
+}
+
 .wsTrail {
   display: grid;
   place-items: center;
@@ -457,26 +405,10 @@ button {
   color: var(--text-2);
 }
 
-.activePill {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 9px 4px 8px;
-  border-radius: 999px;
-  color: #ffffff;
-  background: rgba(255, 255, 255, 0.2);
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.3px;
-  text-transform: uppercase;
-}
-
-.activeDot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: #ffffff;
-  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.25);
+/* Active workspace is marked with a checkmark in the trailing slot. */
+.wsCheck svg {
+  width: 19px;
+  height: 19px;
 }
 
 /* ---------- States ---------- */
@@ -574,28 +506,6 @@ button {
 
 .detailsBox p + p {
   margin-top: 6px;
-}
-
-/* ---------- Status dot (toolbar run-state pill) ---------- */
-.statusDot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--text-3);
-}
-
-.statusDot.live {
-  background: var(--green);
-  box-shadow: 0 0 0 3px rgba(53, 199, 89, 0.18);
-}
-
-.statusDot.off {
-  background: #6c6c74;
-}
-
-.statusDot.missing {
-  background: var(--red);
-  box-shadow: 0 0 0 3px rgba(255, 77, 62, 0.18);
 }
 
 /* ---------- Modal ---------- */
