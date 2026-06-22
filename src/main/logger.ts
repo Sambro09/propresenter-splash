@@ -3,7 +3,7 @@ import { appendFile, mkdir } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 
 export function getSupportLogPath(): string {
-  return join(app.getPath('userData'), 'launcher.log');
+  return join(app.getPath('userData'), 'propresenter-splash.log');
 }
 
 async function writeLog(level: 'INFO' | 'ERROR', message: string, detail?: unknown): Promise<void> {

@@ -1,5 +1,5 @@
 /*
- * Builds the Claude Design bundle for the ProPresenter Workspace Launcher.
+ * Builds the Claude Design bundle for ProPresenter Splash.
  *
  * Each component is emitted as a SELF-CONTAINED preview HTML file: the launcher's
  * real styles.css is inlined verbatim (single source of truth) plus a small
@@ -188,7 +188,7 @@ const components = [
     body: () => `<div class="stage pad"><div class="modal" role="dialog">
       <span class="modalIcon">${I.warnTri}</span>
       <h2>Switch Workspace?</h2>
-      <p>Save any work first. The launcher will close ProPresenter and reopen it with <b>Sunday PM</b>.</p>
+      <p>Save any work first. ProPresenter Splash will close ProPresenter and reopen it with <b>Sunday PM</b>.</p>
       <div class="modalActions">
         <span class="modalSpacer"></span>
         <button class="btn btnGhost" type="button">Cancel</button>
@@ -225,7 +225,7 @@ const components = [
       <div class="label">Empty</div>
       <div class="placeholder" style="height:220px"><span class="placeholderGlyph">${I.stack}</span><h2>No workspaces found</h2><p>/Users/sam/ProPresenter</p><button class="primaryBtn" type="button">${I.folder} Choose Folder</button></div>
       <div class="label">Error</div>
-      <div class="placeholder" style="height:180px"><span class="placeholderGlyph">${I.warnCircle}</span><h2>Launcher unavailable</h2><p>The launcher could not start. Try reopening it.</p></div>
+      <div class="placeholder" style="height:180px"><span class="placeholderGlyph">${I.warnCircle}</span><h2>ProPresenter Splash unavailable</h2><p>ProPresenter Splash could not start. Try reopening it.</p></div>
     </div>`
   },
   {

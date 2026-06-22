@@ -57,7 +57,7 @@ function App(): JSX.Element {
       setLoadStatus('ready');
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error);
-      setMessage(`Could not load launcher state. ${detail}`);
+      setMessage(`Could not load ProPresenter Splash state. ${detail}`);
       setLoadStatus('error');
     }
   }, []);
@@ -574,7 +574,7 @@ function ConfirmDialog({
         </span>
         <h2 id="confirm-title">Switch Workspace?</h2>
         <p>
-          Save any work first. The launcher will close ProPresenter and reopen it with{' '}
+          Save any work first. ProPresenter Splash will close ProPresenter and reopen it with{' '}
           <b>{workspace.name}</b>.
         </p>
         <div className="modalActions">
@@ -612,15 +612,15 @@ function ErrorState(): JSX.Element {
       <span className="placeholderGlyph" aria-hidden="true">
         <WarningCircle size={26} />
       </span>
-      <h2>Launcher unavailable</h2>
-      <p>The launcher could not start. Try reopening it.</p>
+      <h2>ProPresenter Splash unavailable</h2>
+      <p>ProPresenter Splash could not start. Try reopening it.</p>
     </div>
   );
 }
 
 function buildSupportDetails(state: LauncherState | null, message: string | null): string {
   const lines = [
-    'ProPresenter Workspace Launcher support details',
+    'ProPresenter Splash support details',
     `Generated: ${new Date().toISOString()}`,
     `Message: ${message ?? 'none'}`,
     `Workspace root: ${state?.workspaceRoot ?? 'unknown'}`,

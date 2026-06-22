@@ -78,7 +78,7 @@ async function readConfig(): Promise<LauncherConfig> {
       return {};
     }
 
-    void logError('Could not read launcher config; falling back to defaults', error);
+    void logError('Could not read ProPresenter Splash config; falling back to defaults', error);
     return {};
   }
 }

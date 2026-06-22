@@ -55,7 +55,7 @@ jobs:
 
       - name: Verify notarized app
         run: |
-          APP_PATH="$(find dist -maxdepth 2 -name 'ProPresenter Workspace Launcher.app' -type d | head -n 1)"
+          APP_PATH="$(find dist -maxdepth 2 -name 'ProPresenter Splash.app' -type d | head -n 1)"
           test -n "$APP_PATH"
           codesign --verify --deep --strict --verbose=2 "$APP_PATH"
           spctl -a -vvv --type execute "$APP_PATH"
@@ -64,7 +64,7 @@ jobs:
       - name: Upload release artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: propresenter-workspace-launcher-macos
+          name: propresenter-splash-macos
           path: |
             dist/*.dmg
             dist/*.zip

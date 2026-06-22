@@ -1,6 +1,6 @@
-# ProPresenter Workspace Launcher — Specification
+# ProPresenter Splash — Specification
 
-> Working title: **ProPresenter Workspace Launcher** (repo: `propresenter-splash`)
+> Working title: **ProPresenter Splash** (repo: `propresenter-splash`)
 > Status: Draft v0.3 — launcher implemented; release/update infrastructure configured; signed release requires Apple credentials
 > Platform: macOS · Electron · Target app: **ProPresenter 21+**
 
@@ -58,7 +58,7 @@ sit down at the machine.
 |---|---|
 | **Distribution (v1)** | Internal, **code-signed + notarized** (Apple Developer ID). |
 | **Distribution (future)** | **Public distribution** — keep the architecture and packaging ready for it from day one. |
-| **ProPresenter already running** | **Prompt** the user in the launcher (remind them to save), then close & relaunch into the chosen workspace without requiring ProPresenter's own quit prompt. |
+| **ProPresenter already running** | **Prompt** the user in ProPresenter Splash (remind them to save), then close & relaunch into the chosen workspace without requiring ProPresenter's own quit prompt. |
 | **v1 feature scope** | **Minimal launcher** — list + click-to-launch. |
 
 ---
@@ -176,7 +176,7 @@ A single, frameless, centered window (~480×620), styled like a clean macOS laun
 ### Interaction states
 - **Scanning** — brief spinner while the folder is read.
 - **List** — rows of workspaces; the active one is badged; whole row is the click target.
-- **Confirm (PP running)** — modal: *"Save any work first. The launcher will close ProPresenter
+- **Confirm (PP running)** — modal: *"Save any work first. ProPresenter Splash will close ProPresenter
   and reopen '<name>'."* → **Switch Workspace** / **Cancel**.
 - **Launching** — row shows progress ("Quitting ProPresenter…", "Opening '<name>'…").
 - **Empty** — "No ProPresenter workspaces found" + expected location + **Choose folder…** (FR9).
@@ -225,7 +225,7 @@ poll until terminated (timeout ~10s) → activeWorkspace.write(id) → controlle
 - ProPresenter **not installed** → empty/installed-check message (FR6).
 - **No workspaces** found at standard or configured path → empty state + folder picker (FR9).
 - Workspaces folder **inaccessible** (permissions/TCC) → guidance message.
-- ProPresenter **fails to close** within timeout → surface error, keep the user in the launcher,
+- ProPresenter **fails to close** within timeout → surface error, keep the user in ProPresenter Splash,
   and offer Retry.
 - Selected workspace **deleted between scan and click** → re-scan and show error.
 - **Multiple ProPresenter installs** / non-standard install path → resolve via bundle id;
@@ -334,7 +334,7 @@ diagnostics, support docs, and the "niceties"/management features in §13.
   workspaces and marks the active one; clicking one launches PP into **exactly** that workspace
   (verified by PP's Active Workspace).
 - **AC2.** With PP **running**: clicking a different workspace prompts the user inside the
-  launcher, then closes and relaunches PP into the chosen workspace without an extra ProPresenter
+  ProPresenter Splash, then closes and relaunches PP into the chosen workspace without an extra ProPresenter
   quit prompt.
 - **AC3.** Clicking the already-active workspace while PP is running just focuses PP (no restart).
 - **AC4.** PP-not-installed and no-workspaces-found show clear, non-crashing states.

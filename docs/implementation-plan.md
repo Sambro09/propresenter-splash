@@ -1,4 +1,4 @@
-# ProPresenter Workspace Launcher Implementation Plan
+# ProPresenter Splash Implementation Plan
 
 Status: launcher implemented; release/update infrastructure configured
 Date: 2026-06-21

@@ -1,9 +1,9 @@
 {
-  "name": "propresenter-workspace-launcher",
+  "name": "propresenter-splash",
   "version": "0.1.0",
   "private": true,
-  "description": "macOS launcher for choosing a ProPresenter workspace before opening ProPresenter.",
-  "author": "ProPresenter Workspace Launcher Contributors",
+  "description": "macOS splash app for choosing a ProPresenter workspace before opening ProPresenter.",
+  "author": "ProPresenter Splash Contributors",
   "repository": {
     "type": "git",
     "url": "https://github.com/Sambro09/propresenter-splash.git"
@@ -21,8 +21,8 @@
     "typecheck": "tsc --noEmit"
   },
   "build": {
-    "appId": "com.propresenterworkspace.launcher",
-    "productName": "ProPresenter Workspace Launcher",
+    "appId": "com.propresentersplash.app",
+    "productName": "ProPresenter Splash",
     "directories": {
       "buildResources": "build",
       "output": "dist"
@@ -39,7 +39,7 @@
         "releaseType": "release"
       }
     ],
-    "artifactName": "ProPresenter-Workspace-Launcher-${version}-${arch}.${ext}",
+    "artifactName": "ProPresenter-Splash-${version}-${arch}.${ext}",
     "asar": true,
     "mac": {
       "category": "public.app-category.utilities",
@@ -54,7 +54,7 @@
       "entitlementsInherit": "build/entitlements.mac.inherit.plist",
       "notarize": true,
       "extendInfo": {
-        "NSAppleEventsUsageDescription": "ProPresenter Workspace Launcher uses Apple Events to quit or focus ProPresenter when switching workspaces.",
+        "NSAppleEventsUsageDescription": "ProPresenter Splash uses Apple Events to quit or focus ProPresenter when switching workspaces.",
         "NSSupportsAutomaticGraphicsSwitching": true
       }
     },

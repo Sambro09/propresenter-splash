@@ -22,25 +22,25 @@ export function initializeAutoUpdates(): void {
   autoUpdater.autoInstallOnAppQuit = true;
 
   autoUpdater.on('checking-for-update', () => {
-    void logInfo('Checking for launcher update');
+    void logInfo('Checking for ProPresenter Splash update');
   });
 
   autoUpdater.on('update-available', (info) => {
-    void logInfo('Launcher update available', {
+    void logInfo('ProPresenter Splash update available', {
       version: info.version,
       releaseDate: info.releaseDate
     });
   });
 
   autoUpdater.on('update-not-available', (info) => {
-    void logInfo('Launcher update not available', {
+    void logInfo('ProPresenter Splash update not available', {
       version: info.version,
       releaseDate: info.releaseDate
     });
   });
 
   autoUpdater.on('download-progress', (info) => {
-    void logInfo('Launcher update download progress', {
+    void logInfo('ProPresenter Splash update download progress', {
       percent: Math.round(info.percent),
       transferred: info.transferred,
       total: info.total
@@ -48,19 +48,19 @@ export function initializeAutoUpdates(): void {
   });
 
   autoUpdater.on('update-downloaded', (event) => {
-    void logInfo('Launcher update downloaded; will install on quit', {
+    void logInfo('ProPresenter Splash update downloaded; will install on quit', {
       version: event.version,
       releaseDate: event.releaseDate
     });
   });
 
   autoUpdater.on('error', (error) => {
-    void logError('Launcher update check failed', error);
+    void logError('ProPresenter Splash update check failed', error);
   });
 
   const check = (): void => {
     void autoUpdater.checkForUpdatesAndNotify().catch((error: unknown) => {
-      void logError('Launcher update check failed', error);
+      void logError('ProPresenter Splash update check failed', error);
     });
   };
 

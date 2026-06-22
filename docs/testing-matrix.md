@@ -15,10 +15,10 @@ Run this matrix before public distribution and after ProPresenter updates.
 For each tested ProPresenter/macOS combination:
 
 1. Create or identify at least two workspaces.
-2. With ProPresenter closed, open the launcher and verify all workspaces are listed.
+2. With ProPresenter closed, open ProPresenter Splash and verify all workspaces are listed.
 3. Confirm the active workspace badge matches ProPresenter's Settings view.
 4. Select a different workspace and verify ProPresenter launches into exactly that workspace.
-5. With ProPresenter running, select a different workspace and verify the launcher save warning,
+5. With ProPresenter running, select a different workspace and verify the ProPresenter Splash save warning,
    no extra ProPresenter quit prompt, preference write, and relaunch.
 6. With ProPresenter running, select the already-active workspace and verify ProPresenter is
    focused without restart.

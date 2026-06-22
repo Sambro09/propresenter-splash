@@ -30,7 +30,7 @@ function createWindow(): void {
     minWidth: 440,
     minHeight: 560,
     show: false,
-    title: 'ProPresenter Workspace Launcher',
+    title: 'ProPresenter Splash',
     titleBarStyle: 'hiddenInset',
     backgroundColor: '#1b1b1d',
     webPreferences: {
@@ -98,7 +98,7 @@ function runSmokeHooks(window: BrowserWindow): void {
 }
 
 app.whenReady().then(() => {
-  electronApp.setAppUserModelId('com.propresenterworkspace.launcher');
+  electronApp.setAppUserModelId('com.propresentersplash.app');
   initializeDiagnostics();
   createApplicationMenu();
 

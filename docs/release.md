@@ -25,8 +25,8 @@ npm run dist
 
 Expected artifacts:
 
-- `dist/ProPresenter-Workspace-Launcher-0.1.0-arm64.dmg`
-- `dist/ProPresenter-Workspace-Launcher-0.1.0-arm64.zip`
+- `dist/ProPresenter-Splash-0.1.0-arm64.dmg`
+- `dist/ProPresenter-Splash-0.1.0-arm64.zip`
 - `dist/latest-mac.yml`
 
 To publish the signed/notarized artifacts to GitHub Releases for auto-update:
@@ -74,9 +74,9 @@ The workflow uses the built-in `GITHUB_TOKEN` as `GH_TOKEN` for electron-builder
 Replace the app path if building a universal or x64 artifact.
 
 ```sh
-codesign --verify --deep --strict --verbose=2 "dist/mac-arm64/ProPresenter Workspace Launcher.app"
-spctl -a -vvv --type execute "dist/mac-arm64/ProPresenter Workspace Launcher.app"
-xcrun stapler validate "dist/mac-arm64/ProPresenter Workspace Launcher.app"
+codesign --verify --deep --strict --verbose=2 "dist/mac-arm64/ProPresenter Splash.app"
+spctl -a -vvv --type execute "dist/mac-arm64/ProPresenter Splash.app"
+xcrun stapler validate "dist/mac-arm64/ProPresenter Splash.app"
 ```
 
 Before installing on church machines, verify the v1 acceptance criteria on a Mac with
