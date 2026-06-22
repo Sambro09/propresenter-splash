@@ -77,12 +77,7 @@ async function resolveLaunchServicesAppPath(): Promise<string | undefined> {
 }
 
 export async function isProPresenterRunning(): Promise<boolean> {
-  try {
-    await runCommand('pgrep', ['-x', PROPRESENTER_PROCESS_NAME], { timeout: 8_000 });
-    return true;
-  } catch {
-    return false;
-  }
+  return (await getProPresenterPids()).length > 0;
 }
 
 export async function focusProPresenter(appPath: string): Promise<void> {
@@ -112,8 +107,13 @@ export async function quitProPresenterAndWait(timeoutMs = 30_000): Promise<void>
 }
 
 async function requestProPresenterQuit(): Promise<void> {
+  const pids = await getProPresenterPids();
+  if (pids.length === 0) {
+    return;
+  }
+
   try {
-    await runCommand('pkill', ['-TERM', '-x', PROPRESENTER_PROCESS_NAME], { timeout: 8_000 });
+    await runCommand('kill', ['-TERM', ...pids.map(String)], { timeout: 8_000 });
     return;
   } catch (error) {
     if (!(await isProPresenterRunning())) {
@@ -124,6 +124,61 @@ async function requestProPresenterQuit(): Promise<void> {
       `Could not close ProPresenter without showing its quit prompt. ${formatQuitError(error)}`
     );
   }
+}
+
+async function getProPresenterPids(): Promise<number[]> {
+  const pids = new Set<number>();
+
+  for (const pid of await getLaunchServicesPids()) {
+    pids.add(pid);
+  }
+
+  for (const pid of await getProcessNamePids()) {
+    pids.add(pid);
+  }
+
+  return [...pids];
+}
+
+async function getLaunchServicesPids(): Promise<number[]> {
+  try {
+    const { stdout } = await runCommand(
+      'lsappinfo',
+      ['find', `bundleid=${PROPRESENTER_BUNDLE_ID}`],
+      { timeout: 8_000 }
+    );
+    const applicationRecords = stdout
+      .split('\n')
+      .map((line) => line.trim())
+      .filter((line) => line.startsWith('ASN:'));
+
+    const pidResults = await Promise.all(
+      applicationRecords.map((applicationRecord) =>
+        runCommand('lsappinfo', ['info', '-only', 'pid', applicationRecord], {
+          timeout: 8_000
+        })
+      )
+    );
+
+    return pidResults.flatMap((result) => parsePids(result.stdout));
+  } catch {
+    return [];
+  }
+}
+
+async function getProcessNamePids(): Promise<number[]> {
+  try {
+    const { stdout } = await runCommand('pgrep', ['-x', PROPRESENTER_PROCESS_NAME], {
+      timeout: 8_000
+    });
+    return parsePids(stdout);
+  } catch {
+    return [];
+  }
+}
+
+function parsePids(output: string): number[] {
+  return (output.match(/\d+/g) ?? []).map(Number).filter(Number.isSafeInteger);
 }
 
 function formatQuitError(error: unknown): string {

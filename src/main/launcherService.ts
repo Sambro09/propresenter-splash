@@ -201,6 +201,19 @@ export async function requestLogoutConfirmation(): Promise<void> {
     throw new Error('Logout handoff is only available on macOS.');
   }
 
+  if (await isProPresenterRunning()) {
+    try {
+      await logInfo('Quitting ProPresenter before macOS logout');
+      await quitProPresenterAndWait();
+    } catch (error) {
+      await logError('ProPresenter failed to quit before macOS logout', error);
+      const detail = error instanceof Error ? error.message : String(error);
+      throw new Error(
+        `ProPresenter did not quit, so macOS logout was not requested. ${detail}`
+      );
+    }
+  }
+
   await logInfo('Requesting macOS logout confirmation');
   await runCommand('osascript', ['-e', 'tell application "System Events" to log out'], {
     timeout: 8_000
