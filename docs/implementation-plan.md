@@ -262,7 +262,7 @@ Verification:
 ```sh
 npm run typecheck
 npm run build
-npx electron-builder --mac --dir --config.mac.notarize=false --config.mac.identity=null
+npx electron-builder --mac --universal --dir --config.mac.notarize=false --config.mac.identity=null
 ```
 
 Release:

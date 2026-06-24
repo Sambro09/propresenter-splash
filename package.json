@@ -14,9 +14,9 @@
     "dev": "electron-vite dev",
     "build": "npm run typecheck && electron-vite build",
     "preview": "electron-vite preview",
-    "package": "npm run build && electron-builder --mac --dir",
-    "dist": "npm run build && electron-builder --mac",
-    "release": "npm run build && electron-builder --mac --publish always",
+    "package": "npm run build && electron-builder --mac --universal --dir",
+    "dist": "npm run build && electron-builder --mac --universal",
+    "release": "npm run build && electron-builder --mac --universal --publish always",
     "release:check-cert": "node scripts/validate-developer-id-certificate.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"

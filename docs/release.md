@@ -25,8 +25,8 @@ npm run dist
 
 Expected artifacts:
 
-- `dist/ProPresenter-Splash-0.1.0-arm64.dmg`
-- `dist/ProPresenter-Splash-0.1.0-arm64.zip`
+- `dist/ProPresenter-Splash-0.1.0-universal.dmg`
+- `dist/ProPresenter-Splash-0.1.0-universal.zip`
 - `dist/latest-mac.yml`
 
 To publish the signed/notarized artifacts to GitHub Releases for auto-update:
@@ -35,11 +35,14 @@ To publish the signed/notarized artifacts to GitHub Releases for auto-update:
 GH_TOKEN=<token with repo release access> npm run release
 ```
 
+Notarization is tied to the exact signed app artifact, so rebuilt DMGs and ZIPs require a
+fresh notarization run even when the source branch was notarized previously.
+
 For local packaging validation without signing or notarization:
 
 ```sh
 npm run build
-npx electron-builder --mac --dir --config.mac.notarize=false --config.mac.identity=null
+npx electron-builder --mac --universal --dir --config.mac.notarize=false --config.mac.identity=null
 ```
 
 ## CI Release
@@ -71,12 +74,10 @@ The workflow uses the built-in `GITHUB_TOKEN` as `GH_TOKEN` for electron-builder
 
 ## Verify
 
-Replace the app path if building a universal or x64 artifact.
-
 ```sh
-codesign --verify --deep --strict --verbose=2 "dist/mac-arm64/ProPresenter Splash.app"
-spctl -a -vvv --type execute "dist/mac-arm64/ProPresenter Splash.app"
-xcrun stapler validate "dist/mac-arm64/ProPresenter Splash.app"
+codesign --verify --deep --strict --verbose=2 "dist/mac-universal/ProPresenter Splash.app"
+spctl -a -vvv --type execute "dist/mac-universal/ProPresenter Splash.app"
+xcrun stapler validate "dist/mac-universal/ProPresenter Splash.app"
 ```
 
 Before installing on church machines, verify the v1 acceptance criteria on a Mac with
