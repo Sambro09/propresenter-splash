@@ -1,3 +1,5 @@
+import type { CopierCopyRequest, CopierCopyResult, CopierFolderScan } from './copier';
+
 export interface Workspace {
   /** Effective launch target path (an override may repoint this away from `key`). */
   id: string;
@@ -75,6 +77,17 @@ export type WorkspaceOrderDirection = 'up' | 'down';
 
 export type MenuAction = 'rescan' | 'choose-folder';
 
+export type {
+  CopierCategory,
+  CopierCategoryId,
+  CopierCopyRequest,
+  CopierCopyResult,
+  CopierFolderScan,
+  CopierSkippedCategory,
+  CopierSkipReason,
+  CopierTargetOutcome
+} from './copier';
+
 export interface LauncherApi {
   getState: () => Promise<LauncherState>;
   rescan: () => Promise<LauncherState>;
@@ -107,6 +120,10 @@ export interface LauncherApi {
   requestLogout: () => Promise<void>;
   /** Set edit/admin mode; keeps the native menu checkbox in sync. */
   setEditMode: (value: boolean) => Promise<boolean>;
+  /** Open a folder picker and scan the chosen ProPresenter sync folder. */
+  pickCopierFolder: () => Promise<CopierFolderScan | null>;
+  /** Back up each target, then copy the selected category files from the source. */
+  runCopier: (request: CopierCopyRequest) => Promise<CopierCopyResult>;
   /** Subscribe to ProPresenter session state changes. Returns an unsubscribe fn. */
   onSessionState: (handler: (state: SessionState) => void) => () => void;
   /** Subscribe to edit-mode changes driven from the menu bar. Returns an unsubscribe fn. */

@@ -4,11 +4,13 @@ import { fileURLToPath } from 'node:url';
 import { writeFile } from 'node:fs/promises';
 import { electronApp, optimizer } from '@electron-toolkit/utils';
 import type {
+  CopierCopyRequest,
   LaunchResult,
   LaunchWorkspaceOptions,
   WorkspaceOrderDirection,
   WorkspaceOverridePatch
 } from '../shared/types';
+import { pickCopierFolder, runCopier } from './copier/copierService';
 import { initializeDiagnostics } from './diagnostics';
 import { PROPRESENTER_DOWNLOAD_URL } from './proPresenterConstants';
 import {
@@ -200,6 +202,14 @@ app.whenReady().then(() => {
 
   ipcMain.handle('launcher:set-edit-mode', (_event, value: boolean) =>
     setEditMode(Boolean(value), { notifyRenderer: false })
+  );
+
+  ipcMain.handle('launcher:copier-pick-folder', (event) =>
+    pickCopierFolder(BrowserWindow.fromWebContents(event.sender) ?? undefined)
+  );
+
+  ipcMain.handle('launcher:copier-run', (_event, request: CopierCopyRequest) =>
+    runCopier(request)
   );
 
   ipcMain.handle('launcher:set-launch-at-login', (_event, value: boolean) =>
