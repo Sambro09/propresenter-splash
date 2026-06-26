@@ -1,4 +1,11 @@
-import { app, BrowserWindow, clipboard, ipcMain, shell as electronShell } from 'electron';
+import {
+  app,
+  BrowserWindow,
+  clipboard,
+  ipcMain,
+  nativeImage,
+  shell as electronShell
+} from 'electron';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { writeFile } from 'node:fs/promises';
@@ -63,6 +70,24 @@ function raiseToFront(window: BrowserWindow): void {
       window.setAlwaysOnTop(false);
     }
   }, 1_000);
+}
+
+/**
+ * Apply the brand icon to the macOS Dock while developing.
+ *
+ * In a packaged build the Dock and app-switcher icon come from the `.icns`
+ * baked into the `.app` bundle (electron-builder reads `build/icon.icns`), so
+ * this is a no-op there. During `electron-vite dev` there is no bundle, and the
+ * Dock would otherwise fall back to the generic Electron icon.
+ */
+function setDevelopmentDockIcon(): void {
+  if (app.isPackaged || process.platform !== 'darwin' || !app.dock) {
+    return;
+  }
+  const icon = nativeImage.createFromPath(join(app.getAppPath(), 'build', 'icon.png'));
+  if (!icon.isEmpty()) {
+    app.dock.setIcon(icon);
+  }
 }
 
 async function createWindow(): Promise<void> {
@@ -166,6 +191,7 @@ function runSmokeHooks(window: BrowserWindow): void {
 
 app.whenReady().then(() => {
   electronApp.setAppUserModelId('com.propresentersplash.app');
+  setDevelopmentDockIcon();
   initializeDiagnostics();
   createApplicationMenu();
 
