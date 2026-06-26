@@ -1,13 +1,13 @@
 import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vitest/config';
 
-// The copier service imports `electron` (for the folder picker) and the logger
-// imports `electron`'s `app`. Tests run in plain Node, so alias `electron` to a
-// tiny stub that satisfies those imports without a real Electron runtime.
+// Main-process modules import Electron at module load time. Tests run in plain
+// Node, so alias `electron` to a tiny stub without a real Electron runtime.
 export default defineConfig({
   test: {
     environment: 'node',
-    include: ['src/**/*.test.ts']
+    include: ['src/**/*.test.ts'],
+    passWithNoTests: true
   },
   resolve: {
     alias: {
