@@ -1,8 +1,5 @@
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron';
 import type {
-  CopierCopyRequest,
-  CopierCopyResult,
-  CopierFolderScan,
   LauncherApi,
   LauncherState,
   LaunchResult,
@@ -46,10 +43,6 @@ const api: LauncherApi = {
     ipcRenderer.invoke('launcher:request-logout') as Promise<void>,
   setEditMode: (value: boolean) =>
     ipcRenderer.invoke('launcher:set-edit-mode', value) as Promise<boolean>,
-  pickCopierFolder: () =>
-    ipcRenderer.invoke('launcher:copier-pick-folder') as Promise<CopierFolderScan | null>,
-  runCopier: (request: CopierCopyRequest) =>
-    ipcRenderer.invoke('launcher:copier-run', request) as Promise<CopierCopyResult>,
   onSessionState: (handler: (state: SessionState) => void) => {
     const listener = (_event: IpcRendererEvent, state: SessionState): void => handler(state);
     ipcRenderer.on('launcher:session-state', listener);

@@ -7,10 +7,8 @@ import {
   CheckCircle,
   CircleNotch,
   Clipboard,
-  Copy,
   DownloadSimple,
   FolderOpen,
-  FolderPlus,
   Gear,
   IconContext,
   Info,
@@ -19,14 +17,10 @@ import {
   PushPin,
   SignOut,
   Stack,
-  Trash,
   Warning,
   WarningCircle
 } from '@phosphor-icons/react';
 import type {
-  CopierCategoryId,
-  CopierCopyResult,
-  CopierFolderScan,
   LauncherState,
   LaunchWorkspaceOptions,
   SessionState,
@@ -34,7 +28,6 @@ import type {
   WorkspaceOrderDirection,
   WorkspaceOverridePatch
 } from '../../shared/types';
-import { COPIER_CATEGORIES } from '../../shared/copier';
 
 type LoadStatus = 'loading' | 'ready' | 'error';
 type LaunchingState = {
@@ -50,7 +43,6 @@ function App(): JSX.Element {
   const [loadStatus, setLoadStatus] = useState<LoadStatus>('loading');
   const [refreshing, setRefreshing] = useState(false);
   const [editMode, setEditMode] = useState(false);
-  const [copierOpen, setCopierOpen] = useState(false);
   const [editingWorkspace, setEditingWorkspace] = useState<Workspace | null>(null);
   const [launching, setLaunching] = useState<LaunchingState | null>(null);
   const [confirmingWorkspace, setConfirmingWorkspace] = useState<Workspace | null>(null);
@@ -420,7 +412,6 @@ function App(): JSX.Element {
             onSetOperatorMode={handleSetOperatorMode}
             onRefresh={handleRefresh}
             onChooseFolder={handleChooseFolder}
-            onOpenCopier={() => setCopierOpen(true)}
           />
         ) : null}
 
@@ -515,8 +506,6 @@ function App(): JSX.Element {
             onReset={handleResetWorkspace}
           />
         ) : null}
-
-        {copierOpen ? <SettingsCopierModal onClose={() => setCopierOpen(false)} /> : null}
       </div>
     </IconContext.Provider>
   );
@@ -528,8 +517,7 @@ function AdminPanel({
   onSetLaunchAtLogin,
   onSetOperatorMode,
   onRefresh,
-  onChooseFolder,
-  onOpenCopier
+  onChooseFolder
 }: {
   launcherState: LauncherState;
   refreshing: boolean;
@@ -537,7 +525,6 @@ function AdminPanel({
   onSetOperatorMode: (value: boolean) => Promise<void>;
   onRefresh: () => Promise<void>;
   onChooseFolder: () => Promise<void>;
-  onOpenCopier: () => void;
 }): JSX.Element {
   return (
     <section className="adminPanel" aria-label="Admin setup">
@@ -580,384 +567,8 @@ function AdminPanel({
           <FolderOpen size={15} />
           Choose Folder
         </button>
-        <button className="adminBtn" type="button" onClick={onOpenCopier}>
-          <Copy size={15} />
-          Copy Settings…
-        </button>
       </div>
     </section>
-  );
-}
-
-function folderLabel(path: string): string {
-  const trimmed = path.replace(/\/+$/, '');
-  const parts = trimmed.split('/');
-  return parts[parts.length - 1] || trimmed;
-}
-
-function categoryLabel(id: CopierCategoryId): string {
-  return COPIER_CATEGORIES.find((category) => category.id === id)?.label ?? id;
-}
-
-function SettingsCopierModal({ onClose }: { onClose: () => void }): JSX.Element {
-  const [source, setSource] = useState<CopierFolderScan | null>(null);
-  const [targets, setTargets] = useState<CopierFolderScan[]>([]);
-  const [selected, setSelected] = useState<Set<CopierCategoryId>>(new Set());
-  const [picking, setPicking] = useState<'source' | 'target' | null>(null);
-  const [running, setRunning] = useState(false);
-  const [result, setResult] = useState<CopierCopyResult | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  async function chooseSource(): Promise<void> {
-    setPicking('source');
-    setError(null);
-    setResult(null);
-    try {
-      const scan = await window.launcher.pickCopierFolder();
-      if (scan) {
-        setSource(scan);
-        // Default selection: high-confidence categories that exist in the source.
-        const defaults = COPIER_CATEGORIES.filter(
-          (category) => category.confidence === 'high' && scan.matched.includes(category.id)
-        ).map((category) => category.id);
-        setSelected(new Set(defaults));
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setPicking(null);
-    }
-  }
-
-  async function addTarget(): Promise<void> {
-    setPicking('target');
-    setError(null);
-    setResult(null);
-    try {
-      const scan = await window.launcher.pickCopierFolder();
-      if (scan) {
-        setTargets((prev) =>
-          prev.some((existing) => existing.pickedPath === scan.pickedPath) ? prev : [...prev, scan]
-        );
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setPicking(null);
-    }
-  }
-
-  function removeTarget(pickedPath: string): void {
-    setTargets((prev) => prev.filter((target) => target.pickedPath !== pickedPath));
-    setResult(null);
-  }
-
-  function toggleCategory(id: CopierCategoryId): void {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
-      }
-      return next;
-    });
-    setResult(null);
-  }
-
-  async function runCopy(): Promise<void> {
-    if (!source) {
-      return;
-    }
-    setRunning(true);
-    setError(null);
-    try {
-      const res = await window.launcher.runCopier({
-        sourcePath: source.pickedPath,
-        targetPaths: targets.map((target) => target.pickedPath),
-        categories: [...selected]
-      });
-      setResult(res);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setRunning(false);
-    }
-  }
-
-  const selectedIds = [...selected];
-  const validTargets = targets.filter((target) => target.hasConfiguration);
-  const copyable = selectedIds.filter((id) => source?.matched.includes(id));
-  const canCopy =
-    Boolean(source?.hasConfiguration) && validTargets.length > 0 && copyable.length > 0 && !running;
-
-  const warnings: string[] = [];
-  if (source && !source.hasConfiguration) {
-    warnings.push(
-      'The chosen source has no Configuration folder. Pick the sync folder that contains “Configuration”.'
-    );
-  }
-  for (const target of targets) {
-    if (!target.hasConfiguration) {
-      warnings.push(`“${folderLabel(target.pickedPath)}” has no Configuration folder and is skipped.`);
-    }
-  }
-  if (source?.hasConfiguration) {
-    for (const id of selectedIds) {
-      const meta = COPIER_CATEGORIES.find((category) => category.id === id);
-      if (!meta) {
-        continue;
-      }
-      if (!source.matched.includes(id)) {
-        warnings.push(`${meta.label}: no “${meta.file}” file in the source — it will be skipped.`);
-      } else if (validTargets.length > 0) {
-        const missing = validTargets.filter((target) => !target.matched.includes(id)).length;
-        if (missing > 0) {
-          warnings.push(`${meta.label}: missing in ${missing} target(s) — skipped there.`);
-        }
-      }
-    }
-  }
-
-  const busyPicking = picking !== null;
-
-  return (
-    <div className="modalBackdrop">
-      <div
-        className="modal copierModal"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="copier-title"
-      >
-        <span className="modalIcon edit" aria-hidden="true">
-          <Copy size={24} weight="fill" />
-        </span>
-        <h2 id="copier-title">Copy Workspace Settings</h2>
-        <p>
-          Copies selected ProPresenter <b>Configuration</b> settings from one sync folder into
-          others. The <b>source</b> is the folder you copy settings <b>from</b> — it is only read
-          and never changed. Each <b>target</b> is a destination folder you copy those settings{' '}
-          <b>into</b> — its matching files are overwritten (after an automatic backup). This is not
-          official ProPresenter sync.
-        </p>
-
-        {result ? (
-          <>
-            <div className="copierBody">
-              <div className="copierSection">
-                <span className="copierSectionTitle">Results</span>
-                {result.outcomes.map((outcome) => (
-                  <div className="copierResultCard" key={outcome.targetPath}>
-                    <div className="copierResultHead">
-                      {outcome.error ? (
-                        <WarningCircle size={16} weight="fill" />
-                      ) : outcome.copied.length > 0 ? (
-                        <CheckCircle size={16} weight="fill" />
-                      ) : (
-                        <Info size={16} weight="fill" />
-                      )}
-                      <strong>{folderLabel(outcome.targetPath)}</strong>
-                    </div>
-                    {outcome.error ? (
-                      <p className="copierResultError">{outcome.error}</p>
-                    ) : (
-                      <>
-                        <p className="copierResultLine">
-                          {outcome.copied.length > 0
-                            ? `Copied: ${outcome.copied.map(categoryLabel).join(', ')}`
-                            : 'Nothing copied.'}
-                        </p>
-                        {outcome.skipped.length > 0 ? (
-                          <p className="copierResultMuted">
-                            Skipped:{' '}
-                            {outcome.skipped
-                              .map(
-                                (entry) =>
-                                  `${categoryLabel(entry.category)} (${
-                                    entry.reason === 'no-source-file' ? 'not in source' : 'not in target'
-                                  })`
-                              )
-                              .join(', ')}
-                          </p>
-                        ) : null}
-                        {outcome.backupPath ? (
-                          <p className="copierResultMuted">Backup: {outcome.backupPath}</p>
-                        ) : null}
-                      </>
-                    )}
-                  </div>
-                ))}
-              </div>
-              <p className="copierNote">
-                Quit and reopen ProPresenter, then verify screens/looks/macros before going live. Keep
-                each backup folder until you’ve confirmed the result.
-              </p>
-            </div>
-            <div className="modalActions">
-              <button className="resetLink" type="button" onClick={() => setResult(null)}>
-                Copy again
-              </button>
-              <span className="modalSpacer" />
-              <button className="btn btnPrimary" type="button" onClick={onClose}>
-                Done
-              </button>
-            </div>
-          </>
-        ) : (
-          <>
-            <div className="copierBody">
-              <div className="copierSection">
-                <span className="copierSectionTitle">Source</span>
-                {source ? (
-                  <div className="copierFolder">
-                    <FolderOpen size={16} />
-                    <span className="copierFolderText">
-                      <span className="copierFolderName">{folderLabel(source.pickedPath)}</span>
-                      <span className="copierFolderPath">
-                        {source.configurationPath ?? source.pickedPath}
-                      </span>
-                      {!source.hasConfiguration ? (
-                        <span className="copierFolderBad">No Configuration folder found</span>
-                      ) : null}
-                    </span>
-                    <button
-                      className="chooseBtn"
-                      type="button"
-                      onClick={() => void chooseSource()}
-                      disabled={busyPicking}
-                    >
-                      Change…
-                    </button>
-                  </div>
-                ) : (
-                  <button
-                    className="chooseBtn"
-                    type="button"
-                    onClick={() => void chooseSource()}
-                    disabled={busyPicking}
-                  >
-                    {picking === 'source' ? (
-                      <CircleNotch size={15} className="spin" />
-                    ) : (
-                      <FolderOpen size={15} />
-                    )}
-                    Choose source folder…
-                  </button>
-                )}
-              </div>
-
-              <div className="copierSection">
-                <span className="copierSectionTitle">Targets</span>
-                {targets.map((target) => (
-                  <div className="copierFolder" key={target.pickedPath}>
-                    <FolderOpen size={16} />
-                    <span className="copierFolderText">
-                      <span className="copierFolderName">{folderLabel(target.pickedPath)}</span>
-                      <span className="copierFolderPath">
-                        {target.configurationPath ?? target.pickedPath}
-                      </span>
-                      {!target.hasConfiguration ? (
-                        <span className="copierFolderBad">No Configuration folder found</span>
-                      ) : null}
-                    </span>
-                    <button
-                      className="copierRemove"
-                      type="button"
-                      title={`Remove ${folderLabel(target.pickedPath)}`}
-                      aria-label={`Remove ${folderLabel(target.pickedPath)}`}
-                      onClick={() => removeTarget(target.pickedPath)}
-                    >
-                      <Trash size={15} />
-                    </button>
-                  </div>
-                ))}
-                <button
-                  className="chooseBtn"
-                  type="button"
-                  onClick={() => void addTarget()}
-                  disabled={busyPicking}
-                >
-                  {picking === 'target' ? (
-                    <CircleNotch size={15} className="spin" />
-                  ) : (
-                    <FolderPlus size={15} />
-                  )}
-                  Add target folder…
-                </button>
-              </div>
-
-              <div className="copierSection">
-                <span className="copierSectionTitle">Settings to copy</span>
-                {COPIER_CATEGORIES.map((category) => {
-                  const inSource = source?.matched.includes(category.id) ?? false;
-                  const targetsWith = validTargets.filter((target) =>
-                    target.matched.includes(category.id)
-                  ).length;
-                  const hint = !source
-                    ? null
-                    : inSource
-                      ? `source ✓ · ${targetsWith}/${validTargets.length} targets`
-                      : 'not in source';
-                  return (
-                    <label className="copierCatRow" key={category.id}>
-                      <input
-                        type="checkbox"
-                        checked={selected.has(category.id)}
-                        onChange={() => toggleCategory(category.id)}
-                      />
-                      <span className="copierCatMain">
-                        <span className="copierCatLabel">{category.label}</span>
-                        <span className="copierCatMeta">Configuration/{category.file}</span>
-                      </span>
-                      {hint ? <span className="copierCatHint">{hint}</span> : null}
-                    </label>
-                  );
-                })}
-              </div>
-
-              {warnings.length > 0 ? (
-                <div className="copierWarnings">
-                  {warnings.map((warning) => (
-                    <p key={warning}>
-                      <Warning size={13} weight="fill" /> {warning}
-                    </p>
-                  ))}
-                </div>
-              ) : null}
-
-              {error ? (
-                <div className="copierWarnings copierError">
-                  <p>
-                    <WarningCircle size={13} weight="fill" /> {error}
-                  </p>
-                </div>
-              ) : null}
-
-              <p className="copierNote">
-                Quit ProPresenter before copying. Each target’s Configuration folder is backed up
-                first, so the copy is reversible.
-              </p>
-            </div>
-
-            <div className="modalActions">
-              <span className="modalSpacer" />
-              <button className="btn btnGhost" type="button" onClick={onClose} disabled={running}>
-                Cancel
-              </button>
-              <button
-                className="btn btnPrimary"
-                type="button"
-                onClick={() => void runCopy()}
-                disabled={!canCopy}
-              >
-                {running ? <CircleNotch size={16} className="spin" /> : <Copy size={16} />}
-                Copy settings
-              </button>
-            </div>
-          </>
-        )}
-      </div>
-    </div>
   );
 }
 

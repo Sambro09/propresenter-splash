@@ -1,7 +1,6 @@
 /*
  * Minimal `electron` stand-in for unit tests (see vitest.config.ts alias).
- * Only the surface the copier service and logger import at module load time
- * needs to exist; tests never open a real dialog or window.
+ * Only the surface imported by modules under test needs to exist.
  */
 import { tmpdir } from 'node:os';
 
