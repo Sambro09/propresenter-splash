@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ProPresenter Splash — DMG background (Water Caustics)</title>
+<style>
+  html, body { margin: 0; background: #0d0d11; }
+  /* The exportable artwork is exactly #dmg (660 x 400 pt). Render at 2x for
+     Retina: capture at 1320 x 800 and save as background@2x, plus 660 x 400 @1x. */
+  #dmg {
+    position: relative;
+    width: 660px;
+    height: 400px;
+    overflow: hidden;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", sans-serif;
+    -webkit-font-smoothing: antialiased;
+    background:
+      radial-gradient(120% 90% at 26% -10%, rgba(255,150,70,.13), rgba(255,150,70,0) 46%),
+      radial-gradient(120% 100% at 78% 116%, rgba(64,124,255,.20), rgba(64,124,255,0) 52%),
+      radial-gradient(140% 120% at 50% 6%, #1f1f26 0%, #15151a 44%, #0d0d11 100%);
+  }
+</style>
+</head>
+<body>
+  <!-- ===================================================================
+       ProPresenter Splash — DMG installer background · "Water Caustics"
+       660 x 400 pt. Icon-free: the app icon and Applications alias are the
+       REAL Finder-rendered icons placed on top by the DMG layout.
+       Icon centers (window coords, origin top-left):
+         App icon      -> (176, 176)
+         Applications  -> (486, 176)
+  ==================================================================== -->
+  <div id="dmg">
+    <!-- soft caustic light patches -->
+    <div style="position:absolute; left:8%; top:44%; width:46%; height:52%; border-radius:50%; background:radial-gradient(closest-side, rgba(90,150,255,.14), rgba(90,150,255,0)); filter:blur(6px);"></div>
+    <div style="position:absolute; left:52%; top:52%; width:44%; height:48%; border-radius:50%; background:radial-gradient(closest-side, rgba(120,175,255,.12), rgba(120,175,255,0)); filter:blur(6px);"></div>
+
+    <svg viewBox="0 0 660 400" width="660" height="400" style="position:absolute; inset:0;">
+      <defs>
+        <linearGradient id="arw" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stop-color="#5f9dff" stop-opacity="0"/>
+          <stop offset=".35" stop-color="#7fb2ff" stop-opacity=".9"/>
+          <stop offset="1" stop-color="#dfebff"/>
+        </linearGradient>
+      </defs>
+      <!-- horizontal surface ripples, denser & brighter toward the front -->
+      <g fill="none" stroke="#a9c6ff" stroke-linecap="round">
+        <path d="M-10 116 Q 82 110 165 116 T 340 116 T 515 116 T 690 116" stroke-opacity=".05" stroke-width="1"/>
+        <path d="M-10 152 Q 82 145 165 152 T 340 152 T 515 152 T 690 152" stroke-opacity=".07" stroke-width="1"/>
+        <path d="M-10 196 Q 90 187 175 196 T 350 196 T 520 196 T 690 196" stroke-opacity=".10" stroke-width="1.1"/>
+        <path d="M-10 244 Q 90 233 175 244 T 350 244 T 520 244 T 690 244" stroke-opacity=".13" stroke-width="1.2"/>
+        <path d="M-10 296 Q 96 283 182 296 T 360 296 T 528 296 T 700 296" stroke-opacity=".16" stroke-width="1.3"/>
+        <path d="M-10 344 Q 96 330 182 344 T 360 344 T 528 344 T 700 344" stroke-opacity=".10" stroke-width="1.3"/>
+      </g>
+      <!-- flattened ripples sitting at the base of each icon -->
+      <g fill="none">
+        <g stroke="#8fb4ff">
+          <ellipse cx="176" cy="236" rx="80" ry="30" stroke-opacity=".16" stroke-width="1.4"/>
+          <ellipse cx="176" cy="236" rx="128" ry="46" stroke-opacity=".09" stroke-width="1.2"/>
+        </g>
+        <g stroke="#dfeaff">
+          <ellipse cx="486" cy="236" rx="74" ry="28" stroke-opacity=".13" stroke-width="1.3"/>
+          <ellipse cx="486" cy="236" rx="120" ry="42" stroke-opacity=".07" stroke-width="1.1"/>
+        </g>
+      </g>
+      <!-- connecting arrow -->
+      <g transform="translate(0 174)">
+        <line x1="300" y1="0" x2="392" y2="0" stroke="url(#arw)" stroke-width="3" stroke-linecap="round"/>
+        <path d="M382 -8 L400 0 L382 8" fill="none" stroke="#e7f0ff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+      </g>
+    </svg>
+
+    <!-- wordmark -->
+    <div style="position:absolute; top:40px; left:0; right:0; text-align:center;">
+      <div style="color:#7f8794; font-size:10px; font-weight:700; letter-spacing:4px; text-transform:uppercase;">Install</div>
+      <div style="margin-top:6px; color:#f6f7fa; font-size:26px; font-weight:600; letter-spacing:.3px;">ProPresenter Splash</div>
+    </div>
+
+    <!-- recessed placement wells (real icons render on top of these) -->
+    <div style="position:absolute; left:110px; top:110px; width:132px; height:132px; border-radius:28px; background:radial-gradient(120% 120% at 50% 12%, rgba(255,255,255,.05), rgba(255,255,255,0) 60%); box-shadow:inset 0 1px 0 rgba(255,255,255,.08), inset 0 0 0 1px rgba(255,255,255,.05), inset 0 24px 44px rgba(0,0,0,.45);"></div>
+    <div style="position:absolute; left:420px; top:110px; width:132px; height:132px; border-radius:28px; background:radial-gradient(120% 120% at 50% 12%, rgba(90,150,255,.08), rgba(90,150,255,0) 60%); box-shadow:inset 0 1px 0 rgba(255,255,255,.08), inset 0 0 0 1px rgba(120,170,255,.10), inset 0 24px 44px rgba(0,0,0,.45);"></div>
+
+    <!-- instruction microcopy -->
+    <div style="position:absolute; left:0; right:0; bottom:34px; text-align:center; color:#8b8f98; font-size:12.5px; letter-spacing:.2px;">Drag <span style="color:#c9ccd3;">ProPresenter Splash</span> onto the <span style="color:#c9ccd3;">Applications</span> folder to install</div>
+
+    <!-- inset hairline frame -->
+    <div style="position:absolute; inset:14px; border-radius:16px; box-shadow:inset 0 0 0 1px rgba(255,255,255,.06); pointer-events:none;"></div>
+  </div>
+</body>
+</html>

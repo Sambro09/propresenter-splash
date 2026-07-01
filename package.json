@@ -18,6 +18,7 @@
     "dist": "npm run build && electron-builder --mac --universal",
     "release": "npm run build && electron-builder --mac --universal --publish always",
     "release:check-cert": "node scripts/validate-developer-id-certificate.mjs",
+    "build:dmg-background": "node scripts/build-dmg-background.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },
@@ -59,7 +60,24 @@
         "NSSupportsAutomaticGraphicsSwitching": true
       }
     },
-    "dmg": {}
+    "dmg": {
+      "background": "background.png",
+      "iconSize": 128,
+      "iconTextSize": 12,
+      "contents": [
+        {
+          "x": 176,
+          "y": 176,
+          "type": "file"
+        },
+        {
+          "x": 486,
+          "y": 176,
+          "type": "link",
+          "path": "/Applications"
+        }
+      ]
+    }
   },
   "dependencies": {
     "@electron-toolkit/utils": "^4.0.0",
