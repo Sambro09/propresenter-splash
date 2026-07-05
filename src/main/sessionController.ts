@@ -1,15 +1,11 @@
 import { app, BrowserWindow } from 'electron';
-import type { ProPresenterWindowState, SessionState } from '../shared/types';
+import type { SessionState } from '../shared/types';
 import { logError, logInfo } from './logger';
 import { getProPresenterWindowState, isProPresenterRunning } from './proPresenterController';
+import { evaluateWindowStateTransition, type WindowStateObservation } from './windowStateTransition';
 
 const POLL_INTERVAL_MS = 500;
 const LAUNCH_GRACE_MS = 15_000;
-const WINDOW_STATE_DEBOUNCE_MS = 5_000;
-const RECOVERABLE_WINDOW_STATES = new Set<ProPresenterWindowState>([
-  'background',
-  'minimized'
-]);
 
 let sessionState: SessionState = { status: 'idle' };
 let watcher: ReturnType<typeof setTimeout> | undefined;
@@ -17,8 +13,7 @@ let watchedWindowId: number | undefined;
 let polling = false;
 let sessionStartedAt = 0;
 let observedRunning = false;
-let pendingWindowState: ProPresenterWindowState | undefined;
-let pendingWindowStateSince = 0;
+let windowStateObservation: WindowStateObservation = { pendingSince: 0 };
 let sessionGeneration = 0;
 const sessionListeners = new Set<(state: SessionState) => void>();
 
@@ -64,8 +59,7 @@ function stopWatcher(): void {
 }
 
 function resetWindowStateObservation(): void {
-  pendingWindowState = undefined;
-  pendingWindowStateSince = 0;
+  windowStateObservation = { pendingSince: 0 };
 }
 
 export function getSessionState(): SessionState {
@@ -153,37 +147,28 @@ async function pollProPresenter(
 }
 
 async function updateProPresenterWindowState(window: BrowserWindow | null): Promise<void> {
-  const nextWindowState = await getProPresenterWindowState();
-  const now = Date.now();
+  const transition = evaluateWindowStateTransition(
+    sessionState.proPresenterWindow,
+    windowStateObservation,
+    await getProPresenterWindowState(),
+    Date.now()
+  );
+  windowStateObservation = transition.observation;
 
-  if (pendingWindowState !== nextWindowState) {
-    pendingWindowState = nextWindowState;
-    pendingWindowStateSince = now;
+  if (transition.committedState === undefined) {
     return;
   }
 
-  if (now - pendingWindowStateSince < WINDOW_STATE_DEBOUNCE_MS) {
-    return;
-  }
-
-  if (sessionState.proPresenterWindow === nextWindowState) {
-    return;
-  }
-
-  const previousWindowState = sessionState.proPresenterWindow;
   sessionState = {
     ...sessionState,
-    proPresenterWindow: nextWindowState
+    proPresenterWindow: transition.committedState
   };
   emitSessionState(window);
 
-  if (
-    RECOVERABLE_WINDOW_STATES.has(nextWindowState) &&
-    !RECOVERABLE_WINDOW_STATES.has(previousWindowState as ProPresenterWindowState)
-  ) {
+  if (transition.shouldReveal) {
     revealSessionWindowInactive(window);
     await logInfo('ProPresenter window state needs operator attention', {
-      proPresenterWindow: nextWindowState
+      proPresenterWindow: transition.committedState
     });
   }
 }
