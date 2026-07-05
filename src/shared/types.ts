@@ -23,11 +23,14 @@ export interface LauncherSettings {
   operatorMode: boolean;
 }
 
+export type ProPresenterWindowState = 'foreground' | 'background' | 'minimized' | 'unknown';
+
 export interface SessionState {
   status: 'idle' | 'running' | 'ended';
   lastWorkspaceId?: string;
   lastWorkspaceName?: string;
   endedAt?: string;
+  proPresenterWindow?: ProPresenterWindowState;
 }
 
 export interface ProPresenterStatus {
@@ -81,6 +84,8 @@ export interface LauncherApi {
   chooseWorkspacesFolder: () => Promise<LauncherState>;
   copySupportDetails: (details: string) => Promise<void>;
   openProPresenterDownload: () => Promise<void>;
+  /** Bring ProPresenter to the front if it is installed/running. */
+  focusProPresenter: () => Promise<void>;
   launchWorkspace: (
     workspaceId: string,
     options?: LaunchWorkspaceOptions

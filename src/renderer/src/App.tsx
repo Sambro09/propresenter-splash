@@ -167,6 +167,20 @@ function App(): JSX.Element {
     await window.launcher.openProPresenterDownload();
   }
 
+  async function handleFocusProPresenter(): Promise<void> {
+    setMessage(null);
+    setNotice(null);
+    setCopyStatus(null);
+
+    try {
+      await window.launcher.focusProPresenter();
+      setNotice('Bringing ProPresenter to the front.');
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      setMessage(`Could not bring ProPresenter to the front. ${detail}`);
+    }
+  }
+
   async function handleExitEditMode(): Promise<void> {
     const value = await window.launcher.setEditMode(false);
     setEditMode(value);
@@ -379,6 +393,10 @@ function App(): JSX.Element {
   }
 
   const showSessionEnded = sessionState.status === 'ended';
+  const showWindowRecoveryBanner =
+    sessionState.status === 'running' &&
+    (sessionState.proPresenterWindow === 'minimized' ||
+      sessionState.proPresenterWindow === 'background');
 
   return (
     <IconContext.Provider value={ICON_DEFAULTS}>
@@ -424,6 +442,31 @@ function App(): JSX.Element {
                 <DownloadSimple size={15} />
                 Download
               </button>
+            </div>
+          ) : null}
+
+          {showWindowRecoveryBanner ? (
+            <div className="banner info recoveryBanner" role="status">
+              <Info size={18} weight="fill" />
+              <span>{proPresenterWindowRecoveryText(sessionState)}</span>
+              <div className="bannerActions">
+                <button
+                  className="bannerBtn"
+                  type="button"
+                  onClick={() => void handleFocusProPresenter()}
+                >
+                  <MonitorPlay size={15} />
+                  Bring to front
+                </button>
+                <button
+                  className="bannerBtn"
+                  type="button"
+                  onClick={() => void handleChooseAnotherWorkspace()}
+                >
+                  <Stack size={15} />
+                  Switch workspace
+                </button>
+              </div>
             </div>
           ) : null}
 
@@ -968,6 +1011,7 @@ function buildSupportDetails(state: LauncherState | null, message: string | null
     `ProPresenter installed: ${state?.proPresenter.installed ? 'yes' : 'no'}`,
     `ProPresenter running: ${state?.proPresenter.running ? 'yes' : 'no'}`,
     `ProPresenter path: ${state?.proPresenter.appPath ?? 'unknown'}`,
+    `ProPresenter window: ${state?.session.proPresenterWindow ?? 'unknown'}`,
     `Launch at login: ${state?.settings.launchAtLogin ? 'yes' : 'no'}`,
     `Operator mode: ${state?.settings.operatorMode ? 'yes' : 'no'}`,
     `Session: ${state?.session.status ?? 'unknown'}`,
@@ -986,6 +1030,14 @@ function buildSupportDetails(state: LauncherState | null, message: string | null
   ];
 
   return lines.join('\n');
+}
+
+function proPresenterWindowRecoveryText(session: SessionState): string {
+  if (session.proPresenterWindow === 'minimized') {
+    return 'ProPresenter is still open but minimized.';
+  }
+
+  return 'ProPresenter is still open but in the background.';
 }
 
 export default App;

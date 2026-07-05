@@ -318,6 +318,17 @@ button {
   background: var(--accent-strong);
 }
 
+.recoveryBanner {
+  grid-template-columns: 18px minmax(0, 1fr) auto;
+}
+
+.bannerActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  justify-content: flex-end;
+}
+
 .bannerBtn {
   display: inline-flex;
   align-items: center;
@@ -944,6 +955,15 @@ button {
     top: auto;
     bottom: 10px;
     transform: none;
+  }
+
+  .recoveryBanner {
+    grid-template-columns: 18px minmax(0, 1fr);
+  }
+
+  .recoveryBanner .bannerActions {
+    grid-column: 2;
+    justify-content: flex-start;
   }
 }
 

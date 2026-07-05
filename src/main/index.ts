@@ -38,6 +38,7 @@ import { clearSessionState, getSessionState, onSessionChange } from './sessionCo
 import { revealMainWindow, setMainWindow } from './windowManager';
 import { runWorkspaceLaunch } from './workspaceLauncher';
 import { createTray, type UpdateTrayMenu } from './tray';
+import { focusProPresenter, locateProPresenter } from './proPresenterController';
 
 const currentDir = dirname(fileURLToPath(import.meta.url));
 let updateTrayMenu: UpdateTrayMenu = () => {};
@@ -185,6 +186,16 @@ app.whenReady().then(() => {
   ipcMain.handle('launcher:open-propresenter-download', () =>
     electronShell.openExternal(PROPRESENTER_DOWNLOAD_URL)
   );
+
+  ipcMain.handle('launcher:focus-propresenter', async () => {
+    const appPath = await locateProPresenter();
+    if (!appPath) {
+      throw new Error('ProPresenter could not be found on this Mac.');
+    }
+
+    await focusProPresenter(appPath);
+    updateTrayMenu();
+  });
 
   ipcMain.handle(
     'launcher:update-workspace',
