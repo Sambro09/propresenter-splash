@@ -19,6 +19,8 @@ const api: LauncherApi = {
     ipcRenderer.invoke('launcher:copy-support-details', details) as Promise<void>,
   openProPresenterDownload: () =>
     ipcRenderer.invoke('launcher:open-propresenter-download') as Promise<void>,
+  focusProPresenter: () =>
+    ipcRenderer.invoke('launcher:focus-propresenter') as Promise<void>,
   launchWorkspace: (workspaceId: string, options?: LaunchWorkspaceOptions) =>
     ipcRenderer.invoke('launcher:launch-workspace', workspaceId, options) as Promise<LaunchResult>,
   updateWorkspace: (key: string, patch: WorkspaceOverridePatch) =>

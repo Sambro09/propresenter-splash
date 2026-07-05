@@ -49,6 +49,14 @@ function workspaceName(workspace: Pick<Workspace, 'name' | 'path'>): string {
 
 function statusLabel(state: LauncherState): string {
   if (state.session.status === 'running') {
+    if (state.session.proPresenterWindow === 'minimized') {
+      return 'ProPresenter minimized';
+    }
+
+    if (state.session.proPresenterWindow === 'background') {
+      return 'ProPresenter in background';
+    }
+
     return `Running: ${state.session.lastWorkspaceName ?? state.activeWorkspaceName ?? 'workspace'}`;
   }
 

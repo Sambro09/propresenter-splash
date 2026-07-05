@@ -1,6 +1,7 @@
 import { stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
+import type { ProPresenterWindowState } from '../shared/types';
 import { PROPRESENTER_BUNDLE_ID } from './proPresenterConstants';
 import { runCommand } from './shell';
 import { normalizeFilePath } from './pathUtils';
@@ -10,6 +11,12 @@ const COMMON_APP_PATHS = [
   '/Applications/ProPresenter.app'
 ];
 const PROPRESENTER_PROCESS_NAME = 'ProPresenter';
+const WINDOW_STATE_VALUES = new Set<ProPresenterWindowState>([
+  'foreground',
+  'background',
+  'minimized',
+  'unknown'
+]);
 
 async function exists(path: string): Promise<boolean> {
   try {
@@ -78,6 +85,107 @@ async function resolveLaunchServicesAppPath(): Promise<string | undefined> {
 
 export async function isProPresenterRunning(): Promise<boolean> {
   return (await getProPresenterPids()).length > 0;
+}
+
+export async function getProPresenterWindowState(): Promise<ProPresenterWindowState> {
+  if (process.platform !== 'darwin') {
+    return 'unknown';
+  }
+
+  try {
+    return parseProPresenterWindowState(
+      (
+        await runCommand(
+          'osascript',
+          [
+            '-e',
+            `
+tell application "System Events"
+  set proPresenterProcesses to application processes whose bundle identifier is "${PROPRESENTER_BUNDLE_ID}"
+  if (count of proPresenterProcesses) is 0 then return "unknown"
+  set proPresenterProcess to item 1 of proPresenterProcesses
+  set proPresenterIsFrontmost to frontmost of proPresenterProcess
+  set proPresenterWindowCount to count of windows of proPresenterProcess
+  set minimizedWindowFound to false
+  set visibleWindowFound to false
+
+  repeat with proPresenterWindow in windows of proPresenterProcess
+    try
+      set windowIsMinimized to value of attribute "AXMinimized" of proPresenterWindow
+      if windowIsMinimized is true then
+        set minimizedWindowFound to true
+      else
+        set visibleWindowFound to true
+      end if
+    end try
+  end repeat
+
+  if proPresenterIsFrontmost and visibleWindowFound then
+    return "foreground"
+  end if
+
+  if minimizedWindowFound then
+    return "minimized"
+  end if
+
+  if visibleWindowFound then
+    return "background"
+  end if
+
+  if proPresenterWindowCount is 0 then
+    if proPresenterIsFrontmost then
+      return "foreground"
+    else
+      return "background"
+    end if
+  end if
+
+  return "unknown"
+end tell
+`
+          ],
+          { timeout: 8_000 }
+        )
+      ).stdout
+    );
+  } catch {
+    return getProPresenterFrontmostFallbackState();
+  }
+}
+
+async function getProPresenterFrontmostFallbackState(): Promise<ProPresenterWindowState> {
+  try {
+    return parseProPresenterWindowState(
+      (
+        await runCommand(
+          'osascript',
+          [
+            '-e',
+            `
+tell application "System Events"
+  set proPresenterProcesses to application processes whose bundle identifier is "${PROPRESENTER_BUNDLE_ID}"
+  if (count of proPresenterProcesses) is 0 then return "unknown"
+  if frontmost of item 1 of proPresenterProcesses then
+    return "foreground"
+  end if
+  return "background"
+end tell
+`
+          ],
+          { timeout: 8_000 }
+        )
+      ).stdout
+    );
+  } catch {
+    return 'unknown';
+  }
+}
+
+export function parseProPresenterWindowState(output: string): ProPresenterWindowState {
+  const state = output.trim().toLowerCase();
+  return WINDOW_STATE_VALUES.has(state as ProPresenterWindowState)
+    ? (state as ProPresenterWindowState)
+    : 'unknown';
 }
 
 export async function focusProPresenter(appPath: string): Promise<void> {

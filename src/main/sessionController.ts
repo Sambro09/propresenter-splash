@@ -1,10 +1,15 @@
 import { app, BrowserWindow } from 'electron';
-import type { SessionState } from '../shared/types';
+import type { ProPresenterWindowState, SessionState } from '../shared/types';
 import { logError, logInfo } from './logger';
-import { isProPresenterRunning } from './proPresenterController';
+import { getProPresenterWindowState, isProPresenterRunning } from './proPresenterController';
 
 const POLL_INTERVAL_MS = 500;
 const LAUNCH_GRACE_MS = 15_000;
+const WINDOW_STATE_DEBOUNCE_MS = 5_000;
+const RECOVERABLE_WINDOW_STATES = new Set<ProPresenterWindowState>([
+  'background',
+  'minimized'
+]);
 
 let sessionState: SessionState = { status: 'idle' };
 let watcher: ReturnType<typeof setTimeout> | undefined;
@@ -12,6 +17,8 @@ let watchedWindowId: number | undefined;
 let polling = false;
 let sessionStartedAt = 0;
 let observedRunning = false;
+let pendingWindowState: ProPresenterWindowState | undefined;
+let pendingWindowStateSince = 0;
 let sessionGeneration = 0;
 const sessionListeners = new Set<(state: SessionState) => void>();
 
@@ -53,6 +60,12 @@ function stopWatcher(): void {
   }
   polling = false;
   observedRunning = false;
+  resetWindowStateObservation();
+}
+
+function resetWindowStateObservation(): void {
+  pendingWindowState = undefined;
+  pendingWindowStateSince = 0;
 }
 
 export function getSessionState(): SessionState {
@@ -124,6 +137,7 @@ async function pollProPresenter(
     const running = await isProPresenterRunning();
     if (running) {
       observedRunning = true;
+      await updateProPresenterWindowState(window);
     } else if (observedRunning || Date.now() - sessionStartedAt >= LAUNCH_GRACE_MS) {
       shouldContinue = false;
       endProPresenterSession(window);
@@ -136,6 +150,55 @@ async function pollProPresenter(
       schedulePoll(window, generation);
     }
   }
+}
+
+async function updateProPresenterWindowState(window: BrowserWindow | null): Promise<void> {
+  const nextWindowState = await getProPresenterWindowState();
+  const now = Date.now();
+
+  if (pendingWindowState !== nextWindowState) {
+    pendingWindowState = nextWindowState;
+    pendingWindowStateSince = now;
+    return;
+  }
+
+  if (now - pendingWindowStateSince < WINDOW_STATE_DEBOUNCE_MS) {
+    return;
+  }
+
+  if (sessionState.proPresenterWindow === nextWindowState) {
+    return;
+  }
+
+  const previousWindowState = sessionState.proPresenterWindow;
+  sessionState = {
+    ...sessionState,
+    proPresenterWindow: nextWindowState
+  };
+  emitSessionState(window);
+
+  if (
+    RECOVERABLE_WINDOW_STATES.has(nextWindowState) &&
+    !RECOVERABLE_WINDOW_STATES.has(previousWindowState as ProPresenterWindowState)
+  ) {
+    revealSessionWindowInactive(window);
+    await logInfo('ProPresenter window state needs operator attention', {
+      proPresenterWindow: nextWindowState
+    });
+  }
+}
+
+function revealSessionWindowInactive(window: BrowserWindow | null): void {
+  const target = currentWindow(window);
+  if (!target || target.isDestroyed()) {
+    return;
+  }
+
+  if (target.isMinimized()) {
+    target.restore();
+  }
+  target.showInactive();
+  app.dock?.show();
 }
 
 function endProPresenterSession(window: BrowserWindow | null): void {
