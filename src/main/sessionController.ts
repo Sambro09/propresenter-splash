@@ -13,6 +13,7 @@ let polling = false;
 let sessionStartedAt = 0;
 let observedRunning = false;
 let sessionGeneration = 0;
+const sessionListeners = new Set<(state: SessionState) => void>();
 
 function currentWindow(fallback?: BrowserWindow | null): BrowserWindow | null {
   if (watchedWindowId !== undefined) {
@@ -30,9 +31,18 @@ function currentWindow(fallback?: BrowserWindow | null): BrowserWindow | null {
 }
 
 function emitSessionState(window?: BrowserWindow | null): void {
+  const state = getSessionState();
   const target = currentWindow(window);
   if (target && !target.isDestroyed()) {
-    target.webContents.send('launcher:session-state', getSessionState());
+    target.webContents.send('launcher:session-state', state);
+  }
+
+  for (const listener of sessionListeners) {
+    try {
+      listener(state);
+    } catch (error) {
+      void logError('Session state listener failed', error);
+    }
   }
 }
 
@@ -47,6 +57,11 @@ function stopWatcher(): void {
 
 export function getSessionState(): SessionState {
   return { ...sessionState };
+}
+
+export function onSessionChange(listener: (state: SessionState) => void): () => void {
+  sessionListeners.add(listener);
+  return () => sessionListeners.delete(listener);
 }
 
 export function clearSessionState(): SessionState {
@@ -141,8 +156,8 @@ function endProPresenterSession(window: BrowserWindow | null): void {
     target.show();
     target.focus();
     app.focus({ steal: true });
-    emitSessionState(target);
   }
+  emitSessionState(target);
 
   void logInfo('ProPresenter session ended', sessionState);
 }
