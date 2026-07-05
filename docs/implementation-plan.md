@@ -23,8 +23,9 @@ The app should make the Sunday/operator flow feel like this:
 2. The launcher is the only thing they need to look at.
 3. They click the workspace for their service or ministry.
 4. ProPresenter opens in that workspace.
-5. When they are done, they quit ProPresenter.
-6. The Mac clearly guides them to log out or choose another workspace.
+5. When they are done or need a different workspace, they use ProPresenter Splash from the
+   menu-bar item.
+6. The Mac clearly guides them to switch workspaces, reopen the last workspace, or log out.
 
 The launcher is not meant to replace ProPresenter after launch. It is the controlled handoff
 point between macOS login and the correct ProPresenter workspace.
@@ -59,7 +60,8 @@ inside Settings.
 3. Click the correct workspace.
 4. If ProPresenter is already open, save any work when prompted, then confirm the switch.
 5. Use ProPresenter normally.
-6. At the end, quit ProPresenter and log out of macOS.
+6. At the end, use the ProPresenter Splash menu-bar item to switch workspaces or return to
+   the Splash handoff screen for logout.
 
 Expected behavior:
 
@@ -67,7 +69,7 @@ Expected behavior:
 - If ProPresenter is open in the same workspace, clicking that workspace should simply bring
   ProPresenter forward.
 - If ProPresenter is open in a different workspace, the launcher should warn the operator to save,
-  then quit, switch, and relaunch.
+  then close ProPresenter, switch, and relaunch.
 - If something is wrong, the app should keep the operator in the launcher and show a clear support
   action instead of opening ProPresenter into an unknown workspace.
 
@@ -100,7 +102,7 @@ Implemented:
 - **Workspace ordering:** Edit Mode lets admins pin workspaces and move them up/down. The order is
   persisted in launcher config and applied before the alphabetical fallback.
 - **End-of-session prompt:** successful launches keep the app process alive, hide the launcher,
-  watch ProPresenter, and restore the launcher after ProPresenter quits with `Log Out`,
+  watch ProPresenter, and restore the launcher after ProPresenter closes with `Log Out`,
   `Choose Another Workspace`, and `Reopen Last Workspace`.
 - **Logout handoff:** `Log Out` requests the standard macOS logout confirmation through System
   Events rather than forcing immediate logout.
@@ -136,7 +138,7 @@ Implemented:
 - A volunteer can open the correct workspace without using ProPresenter Settings.
 - The launcher never silently opens ProPresenter after a failed workspace switch.
 - If ProPresenter was already running, the user sees one save warning in the launcher.
-- After ProPresenter quits, the user is guided to log out or choose another workspace.
+- After ProPresenter closes, the user is guided to log out or choose another workspace.
 - Admin controls are discoverable for support but not prominent in normal volunteer use.
 - The setup can be repeated on another Mac from documented steps.
 
@@ -174,7 +176,7 @@ Implemented:
 Implemented:
 
 - Exact running-state check using the ProPresenter process name.
-- Confirmation modal before quitting ProPresenter for a workspace switch.
+- Confirmation modal before closing ProPresenter for a workspace switch.
 - Process-level close request to avoid ProPresenter's own quit prompt, then polling until the main
   app terminates.
 - Timeout error if ProPresenter does not close.

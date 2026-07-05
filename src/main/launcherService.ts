@@ -203,13 +203,13 @@ export async function requestLogoutConfirmation(): Promise<void> {
 
   if (await isProPresenterRunning()) {
     try {
-      await logInfo('Quitting ProPresenter before macOS logout');
+      await logInfo('Closing ProPresenter before macOS logout');
       await quitProPresenterAndWait();
     } catch (error) {
-      await logError('ProPresenter failed to quit before macOS logout', error);
+      await logError('ProPresenter failed to close before macOS logout', error);
       const detail = error instanceof Error ? error.message : String(error);
       throw new Error(
-        `ProPresenter did not quit, so macOS logout was not requested. ${detail}`
+        `ProPresenter did not close, so macOS logout was not requested. ${detail}`
       );
     }
   }
@@ -288,15 +288,15 @@ export async function launchWorkspace(
 
   if (running) {
     try {
-      await logInfo('Quitting ProPresenter before workspace switch', { targetPath });
+      await logInfo('Closing ProPresenter before workspace switch', { targetPath });
       await quitProPresenterAndWait();
     } catch (error) {
-      await logError('ProPresenter failed to quit before workspace switch', error);
+      await logError('ProPresenter failed to close before workspace switch', error);
       const detail = error instanceof Error ? error.message : String(error);
       return {
         ok: false,
         code: 'QUIT_FAILED',
-        message: `ProPresenter did not quit, so the workspace was not changed. ${detail}`
+        message: `ProPresenter did not close, so the workspace was not changed. ${detail}`
       };
     }
   }
