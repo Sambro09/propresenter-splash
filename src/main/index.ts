@@ -22,7 +22,6 @@ import {
   chooseDirectory,
   chooseWorkspacesFolder,
   getLauncherState,
-  launchWorkspace,
   moveWorkspace,
   requestLogoutConfirmation,
   resetWorkspaceOverride,
@@ -34,41 +33,11 @@ import {
 import { createApplicationMenu, setEditMode } from './appMenu';
 import { initializeAutoUpdates } from './updates';
 import { getOperatorModeConfig } from './config';
-import {
-  beginProPresenterSession,
-  clearSessionState,
-  getSessionState
-} from './sessionController';
+import { clearSessionState, getSessionState } from './sessionController';
+import { revealMainWindow, setMainWindow } from './windowManager';
+import { runWorkspaceLaunch } from './workspaceLauncher';
 
 const currentDir = dirname(fileURLToPath(import.meta.url));
-
-/**
- * Bring the window to the front and grab focus.
- *
- * macOS suppresses focus-stealing for apps launched in the background (e.g. login
- * items started during login), so a plain `app.focus()` is ignored in that context.
- * The brief `alwaysOnTop` pulse forces the window above others even while focus is
- * suppressed, then we drop back to normal stacking once it is frontmost.
- */
-function raiseToFront(window: BrowserWindow): void {
-  if (window.isDestroyed()) {
-    return;
-  }
-  if (window.isMinimized()) {
-    window.restore();
-  }
-  window.show();
-  window.center();
-  window.setAlwaysOnTop(true);
-  window.focus();
-  app.focus({ steal: true });
-  app.dock?.show();
-  setTimeout(() => {
-    if (!window.isDestroyed()) {
-      window.setAlwaysOnTop(false);
-    }
-  }, 1_000);
-}
 
 /**
  * Apply the brand icon to the macOS Dock while developing.
@@ -107,14 +76,15 @@ async function createWindow(): Promise<void> {
       sandbox: false
     }
   });
+  setMainWindow(mainWindow);
 
   mainWindow.on('ready-to-show', () => {
     mainWindow.show();
     if (operatorMode) {
-      raiseToFront(mainWindow);
+      revealMainWindow({ steal: true });
       // `ready-to-show` often fires before the window server will honor an
       // activation during the login storm — retry once after it settles.
-      setTimeout(() => raiseToFront(mainWindow), 1_500);
+      setTimeout(() => revealMainWindow({ steal: true }), 1_500);
     }
   });
 
@@ -127,23 +97,6 @@ async function createWindow(): Promise<void> {
   } else {
     mainWindow.loadFile(join(currentDir, '../renderer/index.html'));
   }
-}
-
-function beginSessionAndHideWindow(
-  window: BrowserWindow | null,
-  result: LaunchResult,
-  fallbackWorkspaceId: string
-): void {
-  beginProPresenterSession(window, {
-    id: result.workspaceId ?? fallbackWorkspaceId,
-    name: result.workspaceName
-  });
-
-  setTimeout(() => {
-    if (window && !window.isDestroyed()) {
-      window.hide();
-    }
-  }, 700);
 }
 
 function runSmokeHooks(window: BrowserWindow): void {
@@ -237,7 +190,8 @@ app.whenReady().then(() => {
     if (value) {
       const window = BrowserWindow.fromWebContents(event.sender);
       if (window) {
-        raiseToFront(window);
+        setMainWindow(window);
+        revealMainWindow({ steal: true });
       }
     }
     return state;
@@ -266,27 +220,23 @@ app.whenReady().then(() => {
       } satisfies LaunchResult;
     }
 
-    const result: LaunchResult = await launchWorkspace(session.lastWorkspaceId);
-    if (result.ok) {
-      beginSessionAndHideWindow(
-        BrowserWindow.fromWebContents(event.sender),
-        result,
-        session.lastWorkspaceId
-      );
+    const window = BrowserWindow.fromWebContents(event.sender);
+    if (window) {
+      setMainWindow(window);
     }
 
-    return result;
+    return runWorkspaceLaunch(session.lastWorkspaceId);
   });
 
   ipcMain.handle(
     'launcher:launch-workspace',
     async (event, workspaceId: string, options?: LaunchWorkspaceOptions) => {
-      const result: LaunchResult = await launchWorkspace(workspaceId, options);
-      if (result.ok) {
-        beginSessionAndHideWindow(BrowserWindow.fromWebContents(event.sender), result, workspaceId);
+      const window = BrowserWindow.fromWebContents(event.sender);
+      if (window) {
+        setMainWindow(window);
       }
 
-      return result;
+      return runWorkspaceLaunch(workspaceId, options);
     }
   );
 
