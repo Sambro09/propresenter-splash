@@ -211,7 +211,7 @@ export async function quitProPresenterAndWait(timeoutMs = 30_000): Promise<void>
     await new Promise((resolve) => setTimeout(resolve, 500));
   }
 
-  throw new Error('ProPresenter did not quit within 30 seconds.');
+  throw new Error('ProPresenter did not close within 30 seconds.');
 }
 
 async function requestProPresenterQuit(): Promise<void> {

@@ -30,8 +30,8 @@ For each presentation Mac:
 4. Remove ProPresenter from macOS Login Items. ProPresenter must not open before the launcher.
 5. Remove unrelated apps from Login Items for the shared presentation account.
 6. Pin or move common service workspaces in Edit Mode.
-7. Quit ProPresenter after a test launch and verify the launcher returns with **Log Out**,
-   **Choose Another Workspace**, and **Reopen Last Workspace**.
+7. After a test launch, use the ProPresenter Splash menu-bar item to show the launcher and verify
+   **Choose Another Workspace** can start a confirmed switch.
 
 ## Common Cases
 
@@ -51,12 +51,18 @@ Confirm the workspace folder exists. The default is:
 If the church relocated ProPresenter support files, use **Choose folder** in ProPresenter Splash
 and select the relocated `UserWorkspaces` folder.
 
-### ProPresenter Will Not Quit
+### ProPresenter Could Not Close During Switch
 
 ProPresenter Splash asks the operator to save work first, then sends ProPresenter a normal
 termination signal so ProPresenter's own extra quit confirmation does not block the workspace
-switch. If ProPresenter Splash still reports that ProPresenter did not quit, ask the operator to
-quit ProPresenter manually and retry the workspace launch.
+switch. If ProPresenter Splash still reports that ProPresenter did not close, confirm the service
+is no longer live, close ProPresenter manually, and retry the workspace launch.
+
+### ProPresenter Is Minimized Or The Launcher Is Missing
+
+Use the ProPresenter Splash icon in the macOS menu bar. From there, choose **Show ProPresenter
+Splash** to bring the launcher back, or use **Switch Workspace...** to start the save-confirm-switch
+flow. Operators do not need to quit ProPresenter to switch from the Splash menu-bar item.
 
 ### Workspace Switch Fails
 

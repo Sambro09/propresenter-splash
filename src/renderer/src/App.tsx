@@ -345,7 +345,7 @@ function App(): JSX.Element {
       workspaceId: workspace.id,
       label:
         options.confirmQuit && proPresenterIsRunning
-          ? 'Quitting ProPresenter…'
+          ? 'Closing ProPresenter…'
           : `Opening “${workspace.name}”…`
     });
     setMessage(null);
@@ -635,8 +635,12 @@ function SessionEndedScreen({
       <div className="sessionIcon" aria-hidden="true">
         <CheckCircle size={34} weight="fill" />
       </div>
-      <h2>ProPresenter Closed</h2>
+      <h2>Session Finished</h2>
       <p>{workspaceName}</p>
+      <p className="sessionHint">
+        Use these buttons, or the ProPresenter Splash menu-bar icon, to log out, switch, or
+        reopen.
+      </p>
 
       <div className="sessionActions">
         <button
@@ -1033,11 +1037,14 @@ function buildSupportDetails(state: LauncherState | null, message: string | null
 }
 
 function proPresenterWindowRecoveryText(session: SessionState): string {
+  const menuBarHint =
+    'You do not need to quit ProPresenter; use the ProPresenter Splash menu-bar icon to switch.';
+
   if (session.proPresenterWindow === 'minimized') {
-    return 'ProPresenter is still open but minimized.';
+    return `ProPresenter is still open but minimized. ${menuBarHint}`;
   }
 
-  return 'ProPresenter is still open but in the background.';
+  return `ProPresenter is still open but in the background. ${menuBarHint}`;
 }
 
 export default App;

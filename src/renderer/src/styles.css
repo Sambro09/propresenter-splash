@@ -676,6 +676,12 @@ button {
   font-size: 13px;
 }
 
+.sessionScreen .sessionHint {
+  max-width: 390px;
+  color: var(--text-3);
+  line-height: 1.45;
+}
+
 .sessionActions {
   display: grid;
   gap: 9px;

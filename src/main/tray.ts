@@ -175,7 +175,7 @@ async function quitProPresenterFromTray(): Promise<void> {
     await quitProPresenterAndWait();
   } catch (error) {
     await logError('Tray quit ProPresenter failed', error);
-    await showTrayError('ProPresenter could not be quit', formatError(error));
+    await showTrayError('ProPresenter could not be closed', formatError(error));
   } finally {
     updateTrayMenu();
   }
