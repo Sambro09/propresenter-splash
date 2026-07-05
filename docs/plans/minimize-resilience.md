@@ -1,6 +1,6 @@
 # Plan: Minimize Resilience (Menu-Bar Control + Minimized Detection)
 
-Status: proposed
+Status: implemented (Phases 0–4)
 Date: 2026-07-05
 Owner: TBD
 
@@ -246,13 +246,16 @@ Acceptance:
 
 1. **Minimize detection strategy (Phase 2):** ship the precise AX/`AXMinimized` check (needs
    Accessibility permission) or the Apple-Events-only "not frontmost" proxy (no new permission,
-   less precise)? Recommendation: try AX first; keep the frontmost proxy as the documented
-   fallback if the shared-Mac permission friction is unacceptable.
+   less precise)? **Resolved:** shipped the AX check as the primary strategy with the frontmost
+   proxy as an automatic runtime fallback when the AX call fails; the Accessibility grant is
+   documented in `docs/support.md`.
 2. **Auto-surface aggressiveness (Phase 2):** confirm `showInactive()` (no focus steal) is the
-   right default. A focus-stealing reveal is safer to *notice* but dangerous mid-service.
-3. **Global shortcut (Phase 1):** ship in Phase 1 or defer? It is optional polish.
-4. **Tray-only vs Dock + tray:** we keep both (Dock window + menu-bar item). Confirm we do not
-   want a menu-bar-only (LSUIElement) mode for kiosk installs — that would be a separate change.
+   right default. **Resolved:** shipped `showInactive()`; no focus-stealing reveal while a
+   session is running.
+3. **Global shortcut (Phase 1):** ship in Phase 1 or defer? **Resolved: deferred** — not
+   shipped; the tray covers the recovery path.
+4. **Tray-only vs Dock + tray:** we keep both (Dock window + menu-bar item). **Resolved:**
+   kept both; a menu-bar-only (LSUIElement) kiosk mode remains a separate future change.
 
 ## Non-goals
 
