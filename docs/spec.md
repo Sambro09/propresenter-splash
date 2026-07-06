@@ -1,7 +1,7 @@
 # ProPresenter Splash — Specification
 
 > Working title: **ProPresenter Splash** (repo: `propresenter-splash`)
-> Status: Draft v0.3 — launcher implemented; release/update infrastructure configured; signed release requires Apple credentials
+> Status: Draft v0.4 — launcher implemented; future implementation backlog lives in `docs/ROADMAP.md`
 > Platform: macOS · Electron · Target app: **ProPresenter 21+**
 
 ---
@@ -90,7 +90,7 @@ ProPresenter 21.4:
 - `userWorkspaces` stores `NSData` containing a JSON workspace registry; exactly one object
   should have `isActive: true`.
 
-See `docs/phase0-findings.md` for the validated command sequence and evidence.
+The validated command sequence and local evidence are summarized in §11 and §14.
 
 ---
 
@@ -241,8 +241,7 @@ poll until terminated (timeout ~10s) → activeWorkspace.write(id) → controlle
 ## 11. Phased plan & milestones
 
 ### Phase 0 — Discovery spike *(completed 2026-06-21)*
-Goal: nail down the undocumented mechanics. Deliverable complete:
-`docs/phase0-findings.md`.
+Goal: nail down the undocumented mechanics. Findings are captured in this spec.
 - Inventoried `…/RenewedVision/ProPresenter/UserWorkspaces` and confirmed workspace names map
   to local workspace folders.
 - Confirmed ProPresenter 21.4 uses preference domain `com.renewedvision.propresenter`.
@@ -299,6 +298,10 @@ diagnostics, support docs, and the "niceties"/management features in §13.
 - **Niceties:** search/filter, last-used highlight, per-workspace metadata (last modified,
   library/playlist counts).
 - **Management:** create, duplicate, rename, delete workspaces from the app.
+- **Tutorial / onboarding:** first-run guidance for volunteers and admins, including how to
+  choose a workspace, switch from the menu-bar item, and recover when ProPresenter is minimized.
+- **ProPresenter sync support:** make multi-Mac workspace sync easier to understand and verify
+  alongside ProPresenter's built-in sync workflow.
 - **Auto-launch most recent** option / configurable post-launch behavior (keep splash open).
 - **Windows support:** workspaces live at `%AppData%\RenewedVision\ProPresenter\LocalWorkspaces`;
   the launch mechanism would need its own spike (registry/config + process control).
