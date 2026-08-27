@@ -1,7 +1,7 @@
 # ProPresenter Splash Roadmap
 
 Status: future implementation backlog
-Last updated: 2026-07-05
+Last updated: 2026-08-27
 
 Use this as the single planning document for work beyond the implemented launcher. The product
 contract and v1 behavior live in `docs/spec.md`.
@@ -21,6 +21,20 @@ Implemented or scaffolded:
   actions.
 - macOS packaging, signing/notarization configuration, GitHub release workflow, and update-feed
   scaffolding.
+
+## Next Version
+
+- **Faster workspace discovery:** profile the current scan, show a valid cached workspace list at
+  startup, and refresh changed folders in the background. Define startup and full-scan targets
+  from measurements on small and large ProPresenter setups so operators can choose a workspace
+  sooner without seeing stale or missing entries.
+- **Predictable workspace config transfer:** replace broad or repeated config copying with one
+  explicit transfer plan. Copy only supported settings, validate the source and destination,
+  preserve a backup, write changes atomically, and report exactly what changed. Never copy
+  presentation content or machine-specific paths by accident.
+- **Configurable session-end action:** let an admin choose `Log Out` or `Shut Down` for each Mac.
+  Use the selected label in the final action and confirmation, keep `Log Out` as the safe default,
+  and preserve the current save-and-exit safeguards before macOS ends the session.
 
 ## P1: Rollout Hardening
 
@@ -49,8 +63,9 @@ Implemented or scaffolded:
   with multiple Macs.
 - **Compatibility validation:** test each supported ProPresenter/macOS combination after
   ProPresenter updates, especially the undocumented active-workspace preference contract.
-- **Public update readiness:** complete update-feed validation against signed/notarized releases
-  before enabling broad auto-updates.
+- **First public update validation:** install the last signed version, publish the next version
+  through GitHub Releases, and confirm that the app downloads and installs the signed update.
+  Test both Apple silicon and Intel Macs before enabling broad rollout.
 
 ## P3: Workspace UX And Management
 
@@ -80,5 +95,8 @@ Implemented or scaffolded:
 ## Distribution Notes
 
 - Prefer direct download with Developer ID signing and notarization.
+- Publish releases only from version tags on `main`. The GitHub workflow must test the app, verify
+  its Developer ID signature and notarization ticket, and publish the DMG, ZIP, blockmap, and
+  `latest-mac.yml` update manifest together.
 - Avoid Mac App Store distribution unless the architecture changes, because sandboxing blocks
   direct access to ProPresenter support files and preferences.
