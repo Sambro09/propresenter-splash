@@ -15,8 +15,8 @@
     "build": "npm run typecheck && electron-vite build",
     "preview": "electron-vite preview",
     "package": "npm run build && electron-builder --mac --universal --dir",
-    "dist": "npm run build && electron-builder --mac --universal",
-    "release": "npm run build && electron-builder --mac --universal --publish always",
+    "dist": "npm run build && electron-builder --mac --universal --publish never",
+    "release": "npm run dist",
     "release:check-cert": "node scripts/validate-developer-id-certificate.mjs",
     "build:dmg-background": "node scripts/build-dmg-background.mjs",
     "typecheck": "tsc --noEmit",
@@ -107,7 +107,7 @@
     "electron-vite": "^5.0.0",
     "typescript": "^5.7.2",
     "vite": "^7.3.5",
-    "vitest": "^2.1.9"
+    "vitest": "^4.1.11"
   },
   "overrides": {
     "vite": {

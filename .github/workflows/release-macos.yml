@@ -1,17 +1,28 @@
 name: Release macOS
 
 on:
-  workflow_dispatch:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing release tag (for example, v0.2.0)
+        required: true
+        type: string
 
 permissions:
   contents: write
 
+concurrency:
+  group: release-macos-${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
 jobs:
   build:
+    name: Build, verify, and publish
     runs-on: macos-15
+    timeout-minutes: 60
 
     env:
       CSC_LINK: ${{ secrets.MACOS_CERTIFICATE_BASE64 }}
@@ -19,10 +30,14 @@ jobs:
       APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
       APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
 
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ env.RELEASE_TAG }}
 
       - name: Set up Node
         uses: actions/setup-node@v4
@@ -33,39 +48,97 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Validate Developer ID certificate
+      - name: Validate release tag
+        id: release
+        shell: bash
         run: |
+          VERSION="$(node -p "require('./package.json').version")"
+          test "$RELEASE_TAG" = "v$VERSION"
+          git show-ref --verify --quiet "refs/tags/$RELEASE_TAG"
+          git merge-base --is-ancestor "$RELEASE_TAG^{commit}" "origin/main"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Run tests
+        run: npm test
+
+      - name: Validate Developer ID certificate
+        shell: bash
+        run: |
+          test -n "$CSC_LINK"
+          test -n "$CSC_KEY_PASSWORD"
           CERT_PATH="$RUNNER_TEMP/signing-certificate.p12"
           node -e "require('node:fs').writeFileSync(process.argv[1], Buffer.from(process.env.CSC_LINK, 'base64'))" "$CERT_PATH"
           CERT_SUBJECT="$(openssl pkcs12 -in "$CERT_PATH" -nokeys -clcerts -passin "pass:$CSC_KEY_PASSWORD" 2>/dev/null | openssl x509 -noout -subject)"
           echo "$CERT_SUBJECT"
           echo "$CERT_SUBJECT" | grep "Developer ID Application"
+          openssl pkcs12 -in "$CERT_PATH" -nokeys -clcerts -passin "pass:$CSC_KEY_PASSWORD" 2>/dev/null | openssl x509 -checkend 0 -noout
+          openssl pkcs12 -in "$CERT_PATH" -nocerts -nodes -passin "pass:$CSC_KEY_PASSWORD" >/dev/null 2>&1
 
       - name: Write notarization API key
         env:
           APPLE_API_KEY_BASE64: ${{ secrets.APPLE_API_KEY_BASE64 }}
+        shell: bash
         run: |
           test -n "$APPLE_API_KEY_BASE64"
+          test -n "$APPLE_API_KEY_ID"
+          test -n "$APPLE_API_ISSUER"
           API_KEY_PATH="$RUNNER_TEMP/AuthKey_${APPLE_API_KEY_ID}.p8"
           node -e "require('node:fs').writeFileSync(process.argv[1], Buffer.from(process.env.APPLE_API_KEY_BASE64, 'base64'))" "$API_KEY_PATH"
           echo "APPLE_API_KEY=$API_KEY_PATH" >> "$GITHUB_ENV"
 
-      - name: Build, notarize, and publish app
-        run: npm run release
+      - name: Build and notarize app
+        run: npm run dist
 
-      - name: Verify notarized app
+      - name: Verify signed app and update feed
+        shell: bash
         run: |
+          shopt -s nullglob
           APP_PATH="$(find dist -maxdepth 2 -name 'ProPresenter Splash.app' -type d | head -n 1)"
           test -n "$APP_PATH"
           codesign --verify --deep --strict --verbose=2 "$APP_PATH"
+          codesign --display --verbose=4 "$APP_PATH" 2>&1 | grep "Authority=Developer ID Application"
           spctl -a -vvv --type execute "$APP_PATH"
           xcrun stapler validate "$APP_PATH"
 
-      - name: Upload release artifacts
+          DMGS=(dist/*.dmg)
+          ZIPS=(dist/*.zip)
+          test "${#DMGS[@]}" -eq 1
+          test "${#ZIPS[@]}" -eq 1
+
+          test -s dist/latest-mac.yml
+          grep -Fx "version: ${{ steps.release.outputs.version }}" dist/latest-mac.yml
+          grep -Eq '^path: .+\.zip$' dist/latest-mac.yml
+          grep -Eq '^sha512: .+' dist/latest-mac.yml
+
+      - name: Upload workflow artifacts
         uses: actions/upload-artifact@v4
         with:
           name: propresenter-splash-macos
+          if-no-files-found: error
           path: |
             dist/*.dmg
             dist/*.zip
+            dist/*.blockmap
             dist/latest-mac.yml
+
+      - name: Create draft GitHub release
+        id: github_release
+        shell: bash
+        run: |
+          shopt -s nullglob
+          ARTIFACTS=(dist/*.dmg dist/*.zip dist/*.blockmap dist/latest-mac.yml)
+
+          if gh release view "$RELEASE_TAG" --json isDraft --jq '.isDraft' > "$RUNNER_TEMP/release-draft" 2>/dev/null; then
+            test "$(cat "$RUNNER_TEMP/release-draft")" = "true"
+            gh release upload "$RELEASE_TAG" "${ARTIFACTS[@]}" --clobber
+          else
+            gh release create "$RELEASE_TAG" "${ARTIFACTS[@]}" \
+              --draft \
+              --generate-notes \
+              --title "ProPresenter Splash $RELEASE_TAG" \
+              --verify-tag
+          fi
+
+      - name: Publish GitHub release
+        shell: bash
+        run: gh release edit "$RELEASE_TAG" --draft=false --latest
