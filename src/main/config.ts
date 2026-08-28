@@ -23,6 +23,14 @@ interface LauncherConfig {
   pinnedWorkspaceKeys?: string[];
 }
 
+export interface WorkspaceScanConfig {
+  workspaceRoot: string;
+  isCustomWorkspaceRoot: boolean;
+  workspaceOverrides: Record<string, WorkspaceOverride>;
+  workspaceOrder: string[];
+  pinnedWorkspaceKeys: string[];
+}
+
 function configPath(): string {
   return join(app.getPath('userData'), 'config.json');
 }
@@ -153,15 +161,30 @@ export async function getWorkspaceRootConfig(): Promise<{
   };
 }
 
+/**
+ * Read every setting needed by workspace discovery from one config snapshot.
+ *
+ * Startup used to parse the same file three times before it could touch the
+ * workspace folder. Keeping these values together also prevents a scan from
+ * mixing settings from two config revisions.
+ */
+export async function getWorkspaceScanConfig(): Promise<WorkspaceScanConfig> {
+  const config = await readConfig();
+  return {
+    workspaceRoot: config.workspaceRoot
+      ? normalizeFilePath(config.workspaceRoot)
+      : normalizeFilePath(DEFAULT_WORKSPACE_ROOT),
+    isCustomWorkspaceRoot: Boolean(config.workspaceRoot),
+    workspaceOverrides: config.workspaceOverrides ?? {},
+    workspaceOrder: config.workspaceOrder ?? [],
+    pinnedWorkspaceKeys: config.pinnedWorkspaceKeys ?? []
+  };
+}
+
 export async function setCustomWorkspaceRoot(workspaceRoot: string): Promise<void> {
   await updateConfig((config) => {
     config.workspaceRoot = normalizeFilePath(workspaceRoot);
   });
-}
-
-export async function getWorkspaceOverrides(): Promise<Record<string, WorkspaceOverride>> {
-  const config = await readConfig();
-  return config.workspaceOverrides ?? {};
 }
 
 export async function getOperatorModeConfig(): Promise<boolean> {
@@ -173,17 +196,6 @@ export async function setOperatorModeConfig(operatorMode: boolean): Promise<void
   await updateConfig((config) => {
     config.operatorMode = operatorMode;
   });
-}
-
-export async function getWorkspaceDisplayConfig(): Promise<{
-  workspaceOrder: string[];
-  pinnedWorkspaceKeys: string[];
-}> {
-  const config = await readConfig();
-  return {
-    workspaceOrder: config.workspaceOrder ?? [],
-    pinnedWorkspaceKeys: config.pinnedWorkspaceKeys ?? []
-  };
 }
 
 function normalizedKnownKeys(keys: string[]): string[] {

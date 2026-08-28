@@ -118,4 +118,6 @@ export interface LauncherApi {
   onEditMode: (handler: (value: boolean) => void) => () => void;
   /** Subscribe to menu-bar actions (rescan / choose folder / toggle edit). Returns an unsubscribe fn. */
   onMenuAction: (handler: (action: MenuAction) => void) => () => void;
+  /** Receive a live state after the cached startup list has been reconciled. */
+  onLauncherState: (handler: (state: LauncherState) => void) => () => void;
 }

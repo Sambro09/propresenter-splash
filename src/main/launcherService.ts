@@ -12,6 +12,7 @@ import { writeActiveWorkspace } from './activeWorkspace';
 import {
   clearWorkspaceOverride,
   getOperatorModeConfig,
+  getWorkspaceRootConfig,
   moveWorkspaceInOrderConfig,
   setCustomWorkspaceRoot,
   setOperatorModeConfig,
@@ -30,6 +31,15 @@ import {
 } from './proPresenterController';
 import { runCommand } from './shell';
 import { getSessionState } from './sessionController';
+import {
+  readWorkspaceDiscoveryCache,
+  writeWorkspaceDiscoveryCache
+} from './workspaceDiscoveryCache';
+
+type LauncherStateListener = (state: LauncherState) => void;
+
+const launcherStateListeners = new Set<LauncherStateListener>();
+let stateRefreshPromise: Promise<LauncherState> | undefined;
 
 function loginItemAvailable(): boolean {
   return process.platform === 'darwin';
@@ -57,15 +67,26 @@ async function getLauncherSettings(): Promise<LauncherSettings> {
   };
 }
 
-export async function getLauncherState(): Promise<LauncherState> {
+async function refreshLauncherState(): Promise<LauncherState> {
+  const startedAt = performance.now();
+  const durations: Record<string, number> = {};
+  const measure = async <T>(label: string, operation: () => Promise<T>): Promise<T> => {
+    const operationStartedAt = performance.now();
+    try {
+      return await operation();
+    } finally {
+      durations[label] = Math.round(performance.now() - operationStartedAt);
+    }
+  };
+
   const [scan, appPath, running, settings] = await Promise.all([
-    scanWorkspaces(),
-    locateProPresenter(),
-    isProPresenterRunning(),
-    getLauncherSettings()
+    measure('workspaceScanMs', scanWorkspaces),
+    measure('appLocationMs', locateProPresenter),
+    measure('processDetectionMs', isProPresenterRunning),
+    measure('settingsMs', getLauncherSettings)
   ]);
 
-  return {
+  const state: LauncherState = {
     ...scan,
     supportLogPath: getSupportLogPath(),
     proPresenter: {
@@ -76,6 +97,86 @@ export async function getLauncherState(): Promise<LauncherState> {
     settings,
     session: getSessionState()
   };
+
+  await writeWorkspaceDiscoveryCache(scan, state.proPresenter).catch((error: unknown) => {
+    void logError('Could not update workspace discovery cache', error);
+  });
+
+  void logInfo('Launcher state refresh completed', {
+    totalMs: Math.round(performance.now() - startedAt),
+    ...durations,
+    workspaceCount: scan.workspaces.length,
+    scanErrorCount: scan.errors.length
+  });
+
+  for (const listener of launcherStateListeners) {
+    try {
+      listener(state);
+    } catch (error) {
+      void logError('Launcher state listener failed', error);
+    }
+  }
+
+  return state;
+}
+
+/**
+ * Coalesce startup callers (tray, renderer, and session updates) onto one live
+ * refresh. A slow Spotlight or disconnected registry path should only be
+ * queried once at a time.
+ */
+export function getLauncherState(): Promise<LauncherState> {
+  if (!stateRefreshPromise) {
+    stateRefreshPromise = refreshLauncherState().finally(() => {
+      stateRefreshPromise = undefined;
+    });
+  }
+
+  return stateRefreshPromise;
+}
+
+/**
+ * Return the last validated discovery result immediately, then reconcile it
+ * with ProPresenter and the filesystem in the background.
+ */
+export async function getInitialLauncherState(): Promise<LauncherState> {
+  const startedAt = performance.now();
+  const [cache, settings, rootConfig] = await Promise.all([
+    readWorkspaceDiscoveryCache(),
+    getLauncherSettings(),
+    getWorkspaceRootConfig()
+  ]);
+
+  if (!cache || normalizeFilePath(cache.scan.workspaceRoot) !== rootConfig.workspaceRoot) {
+    return getLauncherState();
+  }
+
+  const state: LauncherState = {
+    ...cache.scan,
+    supportLogPath: getSupportLogPath(),
+    proPresenter: cache.proPresenter,
+    settings,
+    session: getSessionState()
+  };
+
+  void logInfo('Workspace discovery cache served', {
+    cacheReadMs: Math.round(performance.now() - startedAt),
+    cacheAgeMs: Math.max(0, Date.now() - Date.parse(cache.refreshedAt)),
+    workspaceCount: cache.scan.workspaces.length
+  });
+
+  // Do not await this: the renderer can act on the known-good list while the
+  // live result is collected and broadcast.
+  void getLauncherState().catch((error: unknown) => {
+    void logError('Background launcher state refresh failed', error);
+  });
+
+  return state;
+}
+
+export function onLauncherStateRefreshed(listener: LauncherStateListener): () => void {
+  launcherStateListeners.add(listener);
+  return () => launcherStateListeners.delete(listener);
 }
 
 export async function chooseWorkspacesFolder(
