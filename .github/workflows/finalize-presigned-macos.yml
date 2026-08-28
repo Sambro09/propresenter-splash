@@ -1,0 +1,215 @@
+name: Finalize pre-signed macOS release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Draft release tag whose version matches package.json
+        required: true
+        type: string
+      presigned_asset:
+        description: ZIP containing the locally Developer ID-signed app
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: finalize-presigned-macos-${{ inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  finalize:
+    name: Notarize, verify, and publish
+    runs-on: macos-15
+    timeout-minutes: 60
+
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      RELEASE_TAG: ${{ inputs.tag }}
+      PRESIGNED_ASSET: ${{ inputs.presigned_asset }}
+      APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+      APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+
+    steps:
+      - name: Check out release source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ env.RELEASE_TAG }}
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate draft release
+        id: release
+        shell: bash
+        run: |
+          VERSION="$(node -p "require('./package.json').version")"
+          test "$RELEASE_TAG" = "v$VERSION"
+          git show-ref --verify --quiet "refs/tags/$RELEASE_TAG"
+          git merge-base --is-ancestor "$RELEASE_TAG^{commit}" "origin/main"
+          test "$(gh release view "$RELEASE_TAG" --json isDraft --jq '.isDraft')" = "true"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Write notarization API key
+        env:
+          APPLE_API_KEY_BASE64: ${{ secrets.APPLE_API_KEY_BASE64 }}
+        shell: bash
+        run: |
+          test -n "$APPLE_API_KEY_BASE64"
+          test -n "$APPLE_API_KEY_ID"
+          test -n "$APPLE_API_ISSUER"
+          API_KEY_PATH="$RUNNER_TEMP/AuthKey_${APPLE_API_KEY_ID}.p8"
+          node -e "require('node:fs').writeFileSync(process.argv[1], Buffer.from(process.env.APPLE_API_KEY_BASE64, 'base64'))" "$API_KEY_PATH"
+          echo "APPLE_API_KEY=$API_KEY_PATH" >> "$GITHUB_ENV"
+
+      - name: Download and verify pre-signed app
+        id: app
+        shell: bash
+        run: |
+          INCOMING_DIR="$RUNNER_TEMP/incoming"
+          APP_DIR="$RUNNER_TEMP/app"
+          mkdir -p "$INCOMING_DIR" "$APP_DIR"
+          gh release download "$RELEASE_TAG" --pattern "$PRESIGNED_ASSET" --dir "$INCOMING_DIR"
+          PRESIGNED_ZIP="$INCOMING_DIR/$PRESIGNED_ASSET"
+          test -s "$PRESIGNED_ZIP"
+          ditto -x -k "$PRESIGNED_ZIP" "$APP_DIR"
+          APP_PATH="$(find "$APP_DIR" -maxdepth 1 -name 'ProPresenter Splash.app' -type d -print -quit)"
+          test -n "$APP_PATH"
+          codesign --verify --deep --strict --verbose=2 "$APP_PATH"
+          codesign --display --verbose=4 "$APP_PATH" 2>&1 | grep -F "Authority=Developer ID Application"
+          codesign --display --verbose=4 "$APP_PATH" 2>&1 | grep -F "TeamIdentifier=56SDVTS4GY"
+          test "$(lipo -archs "$APP_PATH/Contents/MacOS/ProPresenter Splash")" = "x86_64 arm64"
+          echo "presigned_zip=$PRESIGNED_ZIP" >> "$GITHUB_OUTPUT"
+          echo "app_path=$APP_PATH" >> "$GITHUB_OUTPUT"
+
+      - name: Notarize and staple app
+        shell: bash
+        run: |
+          xcrun notarytool submit "${{ steps.app.outputs.presigned_zip }}" \
+            --key "$APPLE_API_KEY" \
+            --key-id "$APPLE_API_KEY_ID" \
+            --issuer "$APPLE_API_ISSUER" \
+            --wait
+          xcrun stapler staple "${{ steps.app.outputs.app_path }}"
+          xcrun stapler validate "${{ steps.app.outputs.app_path }}"
+          spctl -a -vvv --type execute "${{ steps.app.outputs.app_path }}"
+
+      - name: Build update ZIP, blockmap, and manifest
+        id: update
+        shell: bash
+        env:
+          VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          FINAL_DIR="$RUNNER_TEMP/final"
+          ZIP_NAME="ProPresenter-Splash-${VERSION}-universal.zip"
+          ZIP_PATH="$FINAL_DIR/$ZIP_NAME"
+          mkdir -p "$FINAL_DIR"
+          ditto -c -k --sequesterRsrc --keepParent "${{ steps.app.outputs.app_path }}" "$ZIP_PATH"
+          node - "$ZIP_PATH" "$ZIP_PATH.blockmap" "$FINAL_DIR/latest-mac.yml" "$VERSION" <<'NODE'
+          const { writeFile } = require('node:fs/promises');
+          const { basename } = require('node:path');
+          const { buildBlockMap } = require('app-builder-lib/out/targets/blockmap/blockmap.js');
+
+          async function main() {
+            const [zipPath, blockmapPath, manifestPath, version] = process.argv.slice(2);
+            const info = await buildBlockMap(zipPath, 'gzip', blockmapPath);
+            const zipName = basename(zipPath);
+            const manifest = [
+              `version: ${version}`,
+              'files:',
+              `  - url: ${zipName}`,
+              `    sha512: ${info.sha512}`,
+              `    size: ${info.size}`,
+              `path: ${zipName}`,
+              `sha512: ${info.sha512}`,
+              `releaseDate: '${new Date().toISOString()}'`,
+              ''
+            ].join('\n');
+            await writeFile(manifestPath, manifest, 'utf8');
+          }
+
+          main().catch((error) => {
+            console.error(error);
+            process.exitCode = 1;
+          });
+          NODE
+          test -s "$ZIP_PATH"
+          test -s "$ZIP_PATH.blockmap"
+          test -s "$FINAL_DIR/latest-mac.yml"
+          echo "final_dir=$FINAL_DIR" >> "$GITHUB_OUTPUT"
+          echo "zip_path=$ZIP_PATH" >> "$GITHUB_OUTPUT"
+
+      - name: Build, notarize, and staple DMG
+        id: dmg
+        shell: bash
+        env:
+          VERSION: ${{ steps.release.outputs.version }}
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+        run: |
+          FINAL_DIR="${{ steps.update.outputs.final_dir }}"
+          npx electron-builder \
+            --prepackaged "${{ steps.app.outputs.app_path }}" \
+            --mac dmg \
+            --publish never \
+            --config.mac.identity=null \
+            --config.mac.notarize=false \
+            --config.directories.output="$RUNNER_TEMP/dmg"
+          SOURCE_DMG="$(find "$RUNNER_TEMP/dmg" -maxdepth 1 -name '*.dmg' -type f -print -quit)"
+          test -n "$SOURCE_DMG"
+          FINAL_DMG="$FINAL_DIR/ProPresenter-Splash-${VERSION}-universal.dmg"
+          mv "$SOURCE_DMG" "$FINAL_DMG"
+          xcrun notarytool submit "$FINAL_DMG" \
+            --key "$APPLE_API_KEY" \
+            --key-id "$APPLE_API_KEY_ID" \
+            --issuer "$APPLE_API_ISSUER" \
+            --wait
+          xcrun stapler staple "$FINAL_DMG"
+          xcrun stapler validate "$FINAL_DMG"
+          spctl -a -vvv --type open --context context:primary-signature "$FINAL_DMG"
+          echo "dmg_path=$FINAL_DMG" >> "$GITHUB_OUTPUT"
+
+      - name: Verify final update feed
+        shell: bash
+        env:
+          VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          FINAL_DIR="${{ steps.update.outputs.final_dir }}"
+          codesign --verify --deep --strict --verbose=2 "${{ steps.app.outputs.app_path }}"
+          grep -Fx "version: $VERSION" "$FINAL_DIR/latest-mac.yml"
+          grep -Fx "path: ProPresenter-Splash-${VERSION}-universal.zip" "$FINAL_DIR/latest-mac.yml"
+          grep -Eq '^sha512: .+' "$FINAL_DIR/latest-mac.yml"
+          test -s "${{ steps.update.outputs.zip_path }}.blockmap"
+          test -s "${{ steps.dmg.outputs.dmg_path }}"
+
+      - name: Upload workflow artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: propresenter-splash-presigned-macos
+          if-no-files-found: error
+          path: |
+            ${{ steps.dmg.outputs.dmg_path }}
+            ${{ steps.update.outputs.zip_path }}
+            ${{ steps.update.outputs.zip_path }}.blockmap
+            ${{ steps.update.outputs.final_dir }}/latest-mac.yml
+
+      - name: Replace draft assets and publish release
+        shell: bash
+        run: |
+          FINAL_DIR="${{ steps.update.outputs.final_dir }}"
+          gh release upload "$RELEASE_TAG" \
+            "${{ steps.dmg.outputs.dmg_path }}" \
+            "${{ steps.update.outputs.zip_path }}" \
+            "${{ steps.update.outputs.zip_path }}.blockmap" \
+            "$FINAL_DIR/latest-mac.yml" \
+            --clobber
+          gh release delete-asset "$RELEASE_TAG" "$PRESIGNED_ASSET" --yes
+          gh release edit "$RELEASE_TAG" --draft=false --latest
