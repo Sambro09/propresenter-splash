@@ -35,5 +35,5 @@ Then re-sync with the DesignSync tool (ask Claude: "sync the design bundle"):
 | Components  | Edit-mode bar                |
 | Components  | Confirm switch dialog        |
 | Components  | Workspace editor dialog      |
-| States      | Empty / loading / error      |
+| States      | Empty / scanning / error      |
 | Screens     | Launcher — full window       |

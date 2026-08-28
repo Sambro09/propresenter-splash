@@ -999,11 +999,32 @@ function ConfirmDialog({
   );
 }
 
+// Scanning state. Every layer below is decorative and CSS-driven; the logo tile,
+// the light sweep, the ripples and the droplet all come from build/icon.png via
+// styles.css so nothing here redraws the mark.
 function LoadingState(): JSX.Element {
   return (
-    <div className="placeholder">
-      <CircleNotch size={30} className="spin" />
-      <span>Scanning workspaces…</span>
+    <div className="splashScan">
+      <div className="splashStage" aria-hidden="true">
+        <div className="splashLogo">
+          <span className="splashSweep" />
+        </div>
+        <span className="splashDrop" />
+        <div className="splashRipples">
+          <span className="splashRing" />
+          <span className="splashRing" />
+          <span className="splashRing" />
+        </div>
+      </div>
+      <h2 className="splashTitle">
+        Finding your workspaces
+        <span className="splashDots">
+          <i>.</i>
+          <i>.</i>
+          <i>.</i>
+        </span>
+      </h2>
+      <p className="splashHint">The first scan can take a little while.</p>
     </div>
   );
 }

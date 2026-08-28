@@ -219,9 +219,17 @@ const components = [
   {
     file: 'states/states.html',
     group: 'States',
-    title: 'Empty / loading / error',
-    body: () => `<div class="stage"><div class="label">Loading</div>
-      <div class="placeholder" style="height:160px">${I.spinner}<span>Scanning workspaces…</span></div>
+    title: 'Empty / scanning / error',
+    body: () => `<div class="stage"><div class="label">Scanning</div>
+      <div class="splashScan" style="height:300px">
+        <div class="splashStage">
+          <div class="splashLogo"><span class="splashSweep"></span></div>
+          <span class="splashDrop"></span>
+          <div class="splashRipples"><span class="splashRing"></span><span class="splashRing"></span><span class="splashRing"></span></div>
+        </div>
+        <h2 class="splashTitle">Finding your workspaces<span class="splashDots"><i>.</i><i>.</i><i>.</i></span></h2>
+        <p class="splashHint">The first scan can take a little while.</p>
+      </div>
       <div class="label">Empty</div>
       <div class="placeholder" style="height:220px"><span class="placeholderGlyph">${I.stack}</span><h2>No workspaces found</h2><p>/Users/sam/ProPresenter</p><button class="primaryBtn" type="button">${I.folder} Choose Folder</button></div>
       <div class="label">Error</div>
