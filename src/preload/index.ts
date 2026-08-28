@@ -12,7 +12,7 @@ import type {
 
 const api: LauncherApi = {
   getState: () => ipcRenderer.invoke('launcher:get-state') as Promise<LauncherState>,
-  rescan: () => ipcRenderer.invoke('launcher:get-state') as Promise<LauncherState>,
+  rescan: () => ipcRenderer.invoke('launcher:rescan') as Promise<LauncherState>,
   chooseWorkspacesFolder: () =>
     ipcRenderer.invoke('launcher:choose-workspaces-folder') as Promise<LauncherState>,
   copySupportDetails: (details: string) =>
@@ -59,6 +59,11 @@ const api: LauncherApi = {
     const listener = (_event: IpcRendererEvent, action: MenuAction): void => handler(action);
     ipcRenderer.on('launcher:menu-action', listener);
     return () => ipcRenderer.removeListener('launcher:menu-action', listener);
+  },
+  onLauncherState: (handler: (state: LauncherState) => void) => {
+    const listener = (_event: IpcRendererEvent, state: LauncherState): void => handler(state);
+    ipcRenderer.on('launcher:state', listener);
+    return () => ipcRenderer.removeListener('launcher:state', listener);
   }
 };
 

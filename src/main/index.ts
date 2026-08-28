@@ -22,8 +22,10 @@ import { PROPRESENTER_DOWNLOAD_URL } from './proPresenterConstants';
 import {
   chooseDirectory,
   chooseWorkspacesFolder,
+  getInitialLauncherState,
   getLauncherState,
   moveWorkspace,
+  onLauncherStateRefreshed,
   requestLogoutConfirmation,
   resetWorkspaceOverride,
   setLaunchAtLogin,
@@ -164,6 +166,14 @@ app.whenReady().then(() => {
   setDevelopmentDockIcon();
   initializeDiagnostics();
   createApplicationMenu();
+  onLauncherStateRefreshed((state) => {
+    updateTrayMenu(state);
+    for (const window of BrowserWindow.getAllWindows()) {
+      if (!window.isDestroyed()) {
+        window.webContents.send('launcher:state', state);
+      }
+    }
+  });
   updateTrayMenu = createTray({
     showSplash: () => showOrCreateWindow({ steal: true })
   });
@@ -173,7 +183,8 @@ app.whenReady().then(() => {
     optimizer.watchWindowShortcuts(window);
   });
 
-  ipcMain.handle('launcher:get-state', () => withTrayState(getLauncherState()));
+  ipcMain.handle('launcher:get-state', () => withTrayState(getInitialLauncherState()));
+  ipcMain.handle('launcher:rescan', () => withTrayState(getLauncherState()));
 
   ipcMain.handle('launcher:choose-workspaces-folder', (event) =>
     withTrayState(chooseWorkspacesFolder(BrowserWindow.fromWebContents(event.sender) ?? undefined))

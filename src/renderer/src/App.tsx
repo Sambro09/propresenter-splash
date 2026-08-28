@@ -54,8 +54,10 @@ function App(): JSX.Element {
   const [message, setMessage] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [copyStatus, setCopyStatus] = useState<string | null>(null);
+  const stateUpdateVersion = useRef(0);
 
   const loadState = useCallback(async () => {
+    const startingVersion = stateUpdateVersion.current;
     setMessage(null);
     setNotice(null);
     setCopyStatus(null);
@@ -63,10 +65,17 @@ function App(): JSX.Element {
 
     try {
       const nextState = await window.launcher.getState();
-      setLauncherState(nextState);
-      setSessionState(nextState.session);
-      setLoadStatus('ready');
+      // A very fast background refresh can arrive before the cached IPC reply.
+      // Never let that older cached reply overwrite the newer live state.
+      if (stateUpdateVersion.current === startingVersion) {
+        setLauncherState(nextState);
+        setSessionState(nextState.session);
+        setLoadStatus('ready');
+      }
     } catch (error) {
+      if (stateUpdateVersion.current !== startingVersion) {
+        return;
+      }
       const detail = error instanceof Error ? error.message : String(error);
       setMessage(`Could not load ProPresenter Splash state. ${detail}`);
       setLoadStatus('error');
@@ -74,7 +83,14 @@ function App(): JSX.Element {
   }, []);
 
   useEffect(() => {
+    const offState = window.launcher.onLauncherState((state) => {
+      stateUpdateVersion.current += 1;
+      setLauncherState(state);
+      setSessionState(state.session);
+      setLoadStatus('ready');
+    });
     void loadState();
+    return offState;
   }, [loadState]);
 
   async function handleRefresh(): Promise<void> {

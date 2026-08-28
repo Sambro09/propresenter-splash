@@ -1,11 +1,7 @@
 import { readdir, stat } from 'node:fs/promises';
 import { basename, join } from 'node:path';
 import type { Workspace } from '../shared/types';
-import {
-  getWorkspaceDisplayConfig,
-  getWorkspaceOverrides,
-  getWorkspaceRootConfig
-} from './config';
+import { getWorkspaceScanConfig } from './config';
 import { logError } from './logger';
 import {
   readActiveWorkspaceState,
@@ -29,55 +25,73 @@ function registryName(entry: WorkspaceRegistryEntry | undefined, fallbackPath: s
 
 export async function scanWorkspaces(): Promise<WorkspaceScanResult> {
   const errors: string[] = [];
-  const { workspaceRoot, isCustomWorkspaceRoot } = await getWorkspaceRootConfig();
-  const [overrides, displayConfig] = await Promise.all([
-    getWorkspaceOverrides(),
-    getWorkspaceDisplayConfig()
-  ]);
-  const pinnedKeys = new Set(displayConfig.pinnedWorkspaceKeys);
+  const {
+    workspaceRoot,
+    isCustomWorkspaceRoot,
+    workspaceOverrides: overrides,
+    workspaceOrder,
+    pinnedWorkspaceKeys
+  } = await getWorkspaceScanConfig();
+  const pinnedKeys = new Set(pinnedWorkspaceKeys);
   const orderIndex = new Map(
-    displayConfig.workspaceOrder.map((workspaceKey, index) => [workspaceKey, index])
+    workspaceOrder.map((workspaceKey, index) => [workspaceKey, index])
   );
   const directories = new Set<string>();
 
-  let activeState = await readActiveWorkspaceState().catch((error: unknown) => {
-    const message = error instanceof Error ? error.message : String(error);
-    errors.push(`Could not read ProPresenter workspace preferences: ${message}`);
-    void logError('Could not read ProPresenter workspace preferences', error);
-    return {
-      registry: [],
-      activePath: undefined,
-      activeRegistryPath: undefined,
-      applicationShowDirectoryPath: undefined
-    };
-  });
+  const [activeState, workspaceEntries] = await Promise.all([
+    readActiveWorkspaceState().catch((error: unknown) => {
+      const message = error instanceof Error ? error.message : String(error);
+      errors.push(`Could not read ProPresenter workspace preferences: ${message}`);
+      void logError('Could not read ProPresenter workspace preferences', error);
+      return {
+        registry: [],
+        activePath: undefined,
+        activeRegistryPath: undefined,
+        applicationShowDirectoryPath: undefined
+      };
+    }),
+    readdir(workspaceRoot, { withFileTypes: true }).catch((error: unknown) => {
+      const message = error instanceof Error ? error.message : String(error);
+      errors.push(`Could not read workspace folder: ${message}`);
+      void logError('Could not read workspace folder', { workspaceRoot, error });
+      return [];
+    })
+  ]);
 
-  try {
-    const entries = await readdir(workspaceRoot, { withFileTypes: true });
-    for (const entry of entries) {
-      if (entry.isDirectory()) {
-        directories.add(normalizeFilePath(join(workspaceRoot, entry.name)));
-      }
+  for (const entry of workspaceEntries) {
+    if (entry.isDirectory()) {
+      directories.add(normalizeFilePath(join(workspaceRoot, entry.name)));
     }
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    errors.push(`Could not read workspace folder: ${message}`);
-    void logError('Could not read workspace folder', { workspaceRoot, error });
   }
 
-  for (const entry of activeState.registry) {
-    const entryPath = registryEntryPath(entry);
-    if (!entryPath || directories.has(entryPath)) {
-      continue;
-    }
+  const unlistedRegistryPaths = [
+    ...new Set(
+      activeState.registry
+        .map(registryEntryPath)
+        .filter((entryPath): entryPath is string => Boolean(entryPath))
+        .map(normalizeFilePath)
+        .filter((entryPath) => !directories.has(entryPath))
+    )
+  ];
 
-    try {
-      const stats = await stat(entryPath);
-      if (stats.isDirectory()) {
-        directories.add(entryPath);
+  // Registry entries can point at network or cloud volumes. Check them in
+  // parallel so one unavailable path does not multiply the scan delay by the
+  // number of registered workspaces.
+  const registryPathResults = await Promise.all(
+    unlistedRegistryPaths.map(async (entryPath) => {
+      try {
+        const stats = await stat(entryPath);
+        return stats.isDirectory() ? entryPath : undefined;
+      } catch {
+        // Registry entries can outlive folders; ignore missing paths.
+        return undefined;
       }
-    } catch {
-      // Registry entries can outlive folders; ignore missing paths during scanning.
+    })
+  );
+
+  for (const entryPath of registryPathResults) {
+    if (entryPath) {
+      directories.add(entryPath);
     }
   }
 
