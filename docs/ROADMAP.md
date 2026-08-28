@@ -12,11 +12,14 @@ Implemented or scaffolded:
 
 - Electron + TypeScript + Vite app with isolated preload bridge and React renderer.
 - Workspace discovery from ProPresenter's `UserWorkspaces` folder and `userWorkspaces`
-  preference registry.
+  preference registry. Startup now shows the last valid cached list while one shared background
+  scan refreshes the cache and records discovery timings.
 - Active workspace detection and launch-by-selection for ProPresenter 21.4.
 - Running-ProPresenter switch flow with a save warning, quit/wait, preference write, and relaunch.
 - Edit Mode for workspace folder selection, renaming/repointing, pinning, ordering, login item,
-  and focused startup mode.
+  and the session-end system action.
+- First-run Launch at Login permission, default-on registration, and a System Settings handoff
+  when macOS reports that the login item still needs approval.
 - Menu-bar control surface, minimized/backgrounded ProPresenter detection, and session handoff
   actions.
 - macOS packaging, signing/notarization configuration, GitHub release workflow, and update-feed
@@ -24,17 +27,87 @@ Implemented or scaffolded:
 
 ## Next Version
 
-- **Faster workspace discovery:** profile the current scan, show a valid cached workspace list at
-  startup, and refresh changed folders in the background. Define startup and full-scan targets
-  from measurements on small and large ProPresenter setups so operators can choose a workspace
-  sooner without seeing stale or missing entries.
+- [x] **Faster workspace discovery** *(completed 2026-08-27):* show the last valid cached list at
+  startup, coalesce concurrent discovery requests, refresh the list in the background, and log
+  cache and full-scan timings.
 - **Predictable workspace config transfer:** replace broad or repeated config copying with one
   explicit transfer plan. Copy only supported settings, validate the source and destination,
   preserve a backup, write changes atomically, and report exactly what changed. Never copy
   presentation content or machine-specific paths by accident.
-- **Configurable session-end action:** let an admin choose `Log Out` or `Shut Down` for each Mac.
-  Use the selected label in the final action and confirmation, keep `Log Out` as the safe default,
-  and preserve the current save-and-exit safeguards before macOS ends the session.
+- [x] **Configurable session-end action** *(completed 2026-08-27):* let an admin choose `Log Out`
+  or `Shut Down` for the main action shown after ProPresenter closes. Always show
+  `Open Most Recent Workspace` and `Choose Other Workspace`.
+
+### Configurable Session-End Screen Plan
+
+#### Product behavior
+
+- Put an **End screen** two-choice toggle for `Log Out` or `Shut Down` in the main Edit Mode
+  settings row.
+- Always show `Open Most Recent Workspace` and `Choose Other Workspace` on the end screen.
+- Default to `Log Out`. Existing installs keep their current system action.
+- Apply changes without an app restart and persist them per Mac.
+- Use the selected system action in the button label, icon, help text, busy state, success message,
+  error message, and macOS confirmation request.
+- Always open the launcher in focused startup mode. Do not expose a setting for this behavior.
+
+#### Data and API design
+
+- Add one settings object instead of three unrelated configuration fields:
+
+  ```ts
+  interface SessionEndSettings {
+    systemAction: 'logout' | 'shutdown';
+  }
+  ```
+
+- Store the object in `config.json` and expose it through `LauncherSettings`. Treat a missing or
+  malformed object as the safe defaults above so upgrades need no migration step.
+- Add one atomic `setSessionEndSettings(patch)` IPC call. Return the updated settings only and
+  merge them into renderer state. A settings-only change must not trigger a workspace rescan.
+- Replace the logout-specific renderer call with `requestSessionEnd()`. The main process reads the
+  saved system action instead of trusting an action supplied by the renderer.
+
+#### Main-process behavior
+
+- Show a native confirmation for both actions before changing system state. If the operator
+  confirms, check whether ProPresenter is running, ask it to quit, wait for full termination, and
+  stop if it does not close.
+- Add the shutdown command beside the existing logout command in one system-action service.
+- Keep the end screen open if macOS rejects the request or the command fails. Show a useful error
+  and allow the operator to retry. Never fall back from `Shut Down` to `Log Out`, or the reverse.
+- Validate the action again in the main process and reject unsupported platforms or values.
+
+#### Renderer work
+
+- Extend the existing Edit Mode admin panel with one End screen control. Disable it while the
+  setting is saved, then show the persisted value returned by the main process.
+- Pass `SessionEndSettings` into the existing session-ended screen. Render one system-action button
+  followed by the two permanent workspace buttons.
+- Rename the existing workspace actions to the planned operator-facing labels. Keep the most recent
+  workspace name visible on the screen so the operator knows what that button will open.
+- Use one `system` busy state instead of separate logout and shutdown states. Keep all visible end
+  actions disabled while any end action is running to prevent duplicate requests.
+
+#### Verification and delivery order
+
+1. Add config parsing, defaults, and round-trip tests.
+2. Add the shared system-action service and tests for logout, shutdown, ProPresenter quit failure,
+   command failure, and invalid settings.
+3. Add the typed IPC methods and verify that a settings update does not run workspace discovery.
+4. Add the Edit Mode control and permanent workspace buttons.
+5. Run type-checks and unit tests. Before release, test both system actions and the first-run login
+   item flow in a packaged macOS build on a non-production account.
+
+Acceptance criteria:
+
+- A fresh or upgraded install shows `Log Out`, `Open Most Recent Workspace`, and
+  `Choose Other Workspace`.
+- Edit Mode can switch the system action between `Log Out` and `Shut Down`.
+- The chosen configuration survives an app restart and appears on the next completed session.
+- The configured macOS action runs only after ProPresenter has fully closed. A quit or command
+  failure leaves the user on the end screen with an error.
+- `Open Most Recent Workspace` and `Choose Other Workspace` remain visible for both system actions.
 
 ## P1: Rollout Hardening
 

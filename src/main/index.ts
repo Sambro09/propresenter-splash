@@ -14,28 +14,30 @@ import type {
   LauncherState,
   LaunchResult,
   LaunchWorkspaceOptions,
+  SessionEndSettingsPatch,
   WorkspaceOrderDirection,
   WorkspaceOverridePatch
 } from '../shared/types';
 import { initializeDiagnostics } from './diagnostics';
+import { logError } from './logger';
 import { PROPRESENTER_DOWNLOAD_URL } from './proPresenterConstants';
 import {
   chooseDirectory,
   chooseWorkspacesFolder,
   getInitialLauncherState,
   getLauncherState,
+  initializeLaunchAtLogin,
   moveWorkspace,
   onLauncherStateRefreshed,
-  requestLogoutConfirmation,
+  requestSessionEndConfirmation,
   resetWorkspaceOverride,
   setLaunchAtLogin,
-  setOperatorMode,
+  setSessionEndSettings,
   setWorkspacePinned,
   updateWorkspaceOverride
 } from './launcherService';
 import { createApplicationMenu, setEditMode } from './appMenu';
 import { initializeAutoUpdates } from './updates';
-import { getOperatorModeConfig } from './config';
 import { clearSessionState, getSessionState, onSessionChange } from './sessionController';
 import { revealMainWindow, setMainWindow } from './windowManager';
 import { runWorkspaceLaunch } from './workspaceLauncher';
@@ -63,12 +65,11 @@ function setDevelopmentDockIcon(): void {
   }
 }
 
-async function createWindow(options: { focusOnReady?: boolean } = {}): Promise<void> {
-  const operatorMode = await getOperatorModeConfig();
+async function createWindow(): Promise<void> {
   const mainWindow = new BrowserWindow({
-    width: operatorMode ? 720 : 500,
-    height: operatorMode ? 760 : 640,
-    minWidth: operatorMode ? 560 : 440,
+    width: 720,
+    height: 760,
+    minWidth: 560,
     minHeight: 560,
     center: true,
     show: false,
@@ -86,12 +87,21 @@ async function createWindow(options: { focusOnReady?: boolean } = {}): Promise<v
 
   mainWindow.on('ready-to-show', () => {
     mainWindow.show();
-    if (operatorMode || options.focusOnReady) {
-      revealMainWindow({ steal: true });
-      // `ready-to-show` often fires before the window server will honor an
-      // activation during the login storm — retry once after it settles.
-      setTimeout(() => revealMainWindow({ steal: true }), 1_500);
-    }
+    revealMainWindow({ steal: true });
+    // `ready-to-show` often fires before the window server will honor an
+    // activation during the login storm — retry once after it settles.
+    setTimeout(() => revealMainWindow({ steal: true }), 1_500);
+
+    void initializeLaunchAtLogin(mainWindow)
+      .then((handledFirstRun) => {
+        if (handledFirstRun) {
+          return withTrayState(getLauncherState());
+        }
+        return undefined;
+      })
+      .catch((error: unknown) => {
+        void logError('Could not complete first-run Launch at Login setup', error);
+      });
   });
 
   mainWindow.webContents.once('did-finish-load', () => {
@@ -111,7 +121,7 @@ async function showOrCreateWindow({ steal }: { steal: boolean }): Promise<void> 
     return;
   }
 
-  await createWindow({ focusOnReady: steal });
+  await createWindow();
 }
 
 async function withTrayState(statePromise: Promise<LauncherState>): Promise<LauncherState> {
@@ -230,18 +240,10 @@ app.whenReady().then(() => {
     withTrayState(setLaunchAtLogin(Boolean(value)))
   );
 
-  ipcMain.handle('launcher:set-operator-mode', async (event, value: boolean) => {
-    const state = await setOperatorMode(Boolean(value));
-    updateTrayMenu(state);
-    if (value) {
-      const window = BrowserWindow.fromWebContents(event.sender);
-      if (window) {
-        setMainWindow(window);
-        revealMainWindow({ steal: true });
-      }
-    }
-    return state;
-  });
+  ipcMain.handle(
+    'launcher:set-session-end-settings',
+    (_event, patch: SessionEndSettingsPatch) => setSessionEndSettings(patch)
+  );
 
   ipcMain.handle('launcher:set-workspace-pinned', (_event, key: string, pinned: boolean) =>
     withTrayState(setWorkspacePinned(key, Boolean(pinned)))
@@ -259,9 +261,12 @@ app.whenReady().then(() => {
     return session;
   });
 
-  ipcMain.handle('launcher:request-logout', async () => {
-    await requestLogoutConfirmation();
+  ipcMain.handle('launcher:request-session-end', async (event) => {
+    const requested = await requestSessionEndConfirmation(
+      BrowserWindow.fromWebContents(event.sender) ?? undefined
+    );
     updateTrayMenu();
+    return requested;
   });
 
   ipcMain.handle('launcher:reopen-last-workspace', async (event) => {
@@ -303,7 +308,7 @@ app.whenReady().then(() => {
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
-      void createWindow({ focusOnReady: true });
+      void createWindow();
     }
   });
 });

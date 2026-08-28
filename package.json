@@ -115,6 +115,7 @@
     }
   },
   "allowScripts": {
+    "electron@42.4.1": true,
     "esbuild@0.25.12": true,
     "esbuild@0.28.1": true,
     "@swc/core@1.15.41": true

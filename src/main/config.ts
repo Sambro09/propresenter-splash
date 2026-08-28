@@ -1,7 +1,11 @@
 import { app } from 'electron';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
-import type { WorkspaceOverridePatch } from '../shared/types';
+import type {
+  SessionEndSettings,
+  SessionEndSettingsPatch,
+  WorkspaceOverridePatch
+} from '../shared/types';
 import { DEFAULT_WORKSPACE_ROOT } from './proPresenterConstants';
 import { normalizeFilePath } from './pathUtils';
 import { logError } from './logger';
@@ -15,13 +19,19 @@ interface LauncherConfig {
   workspaceRoot?: string;
   /** Per-workspace admin overrides keyed by the originally scanned folder path. */
   workspaceOverrides?: Record<string, WorkspaceOverride>;
-  /** Opens as a focused, centered operator handoff window on startup. */
-  operatorMode?: boolean;
   /** Stable admin-defined workspace order keyed by originally scanned folder path. */
   workspaceOrder?: string[];
   /** Workspaces visually marked as pinned in admin mode. */
   pinnedWorkspaceKeys?: string[];
+  /** Buttons and system action shown after ProPresenter closes. */
+  sessionEnd?: SessionEndSettings;
+  /** True after the first-run Launch at Login choice has been shown. */
+  launchAtLoginSetupComplete?: boolean;
 }
+
+export const DEFAULT_SESSION_END_SETTINGS: SessionEndSettings = {
+  systemAction: 'logout'
+};
 
 export interface WorkspaceScanConfig {
   workspaceRoot: string;
@@ -87,6 +97,20 @@ function sanitizePathList(value: unknown): string[] {
   return result;
 }
 
+export function sanitizeSessionEndSettings(value: unknown): SessionEndSettings {
+  if (!value || typeof value !== 'object') {
+    return { ...DEFAULT_SESSION_END_SETTINGS };
+  }
+
+  const candidate = value as Partial<SessionEndSettings>;
+  return {
+    systemAction:
+      candidate.systemAction === 'logout' || candidate.systemAction === 'shutdown'
+        ? candidate.systemAction
+        : DEFAULT_SESSION_END_SETTINGS.systemAction
+  };
+}
+
 async function readConfig(): Promise<LauncherConfig> {
   try {
     const raw = await readFile(configPath(), 'utf8');
@@ -108,11 +132,6 @@ async function readConfig(): Promise<LauncherConfig> {
       config.workspaceOverrides = overrides;
     }
 
-    const operatorMode = (parsed as LauncherConfig).operatorMode;
-    if (typeof operatorMode === 'boolean') {
-      config.operatorMode = operatorMode;
-    }
-
     const workspaceOrder = sanitizePathList((parsed as LauncherConfig).workspaceOrder);
     if (workspaceOrder.length > 0) {
       config.workspaceOrder = workspaceOrder;
@@ -121,6 +140,15 @@ async function readConfig(): Promise<LauncherConfig> {
     const pinnedWorkspaceKeys = sanitizePathList((parsed as LauncherConfig).pinnedWorkspaceKeys);
     if (pinnedWorkspaceKeys.length > 0) {
       config.pinnedWorkspaceKeys = pinnedWorkspaceKeys;
+    }
+
+    if ((parsed as LauncherConfig).sessionEnd !== undefined) {
+      config.sessionEnd = sanitizeSessionEndSettings((parsed as LauncherConfig).sessionEnd);
+    }
+
+    const launchAtLoginSetupComplete = (parsed as LauncherConfig).launchAtLoginSetupComplete;
+    if (typeof launchAtLoginSetupComplete === 'boolean') {
+      config.launchAtLoginSetupComplete = launchAtLoginSetupComplete;
     }
 
     return config;
@@ -187,15 +215,44 @@ export async function setCustomWorkspaceRoot(workspaceRoot: string): Promise<voi
   });
 }
 
-export async function getOperatorModeConfig(): Promise<boolean> {
+export async function getLaunchAtLoginSetupCompleteConfig(): Promise<boolean> {
   const config = await readConfig();
-  return config.operatorMode ?? true;
+  return config.launchAtLoginSetupComplete ?? false;
 }
 
-export async function setOperatorModeConfig(operatorMode: boolean): Promise<void> {
+export async function setLaunchAtLoginSetupCompleteConfig(value: boolean): Promise<void> {
   await updateConfig((config) => {
-    config.operatorMode = operatorMode;
+    config.launchAtLoginSetupComplete = value;
   });
+}
+
+export async function getSessionEndSettingsConfig(): Promise<SessionEndSettings> {
+  const config = await readConfig();
+  return sanitizeSessionEndSettings(config.sessionEnd);
+}
+
+export async function setSessionEndSettingsConfig(
+  patch: SessionEndSettingsPatch
+): Promise<SessionEndSettings> {
+  if (!patch || typeof patch !== 'object') {
+    throw new Error('Session-end settings must be an object.');
+  }
+  if (
+    patch.systemAction !== undefined &&
+    patch.systemAction !== 'logout' &&
+    patch.systemAction !== 'shutdown'
+  ) {
+    throw new Error('Unsupported session-end system action.');
+  }
+  let updated = { ...DEFAULT_SESSION_END_SETTINGS };
+  await updateConfig((config) => {
+    const current = sanitizeSessionEndSettings(config.sessionEnd);
+    updated = {
+      systemAction: patch.systemAction ?? current.systemAction
+    };
+    config.sessionEnd = updated;
+  });
+  return updated;
 }
 
 function normalizedKnownKeys(keys: string[]): string[] {
