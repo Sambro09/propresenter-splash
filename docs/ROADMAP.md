@@ -169,7 +169,7 @@ Acceptance criteria:
 
 - Prefer direct download with Developer ID signing and notarization.
 - Publish releases only from version tags on `main`. The GitHub workflow must test the app, verify
-  its Developer ID signature and notarization ticket, and publish the DMG, ZIP, and
+  its Developer ID signature and notarization ticket, and publish the DMG, ZIP, blockmap, and
   `latest-mac.yml` update manifest together.
 - Avoid Mac App Store distribution unless the architecture changes, because sandboxing blocks
   direct access to ProPresenter support files and preferences.
