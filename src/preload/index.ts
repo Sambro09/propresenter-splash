@@ -5,6 +5,8 @@ import type {
   LaunchResult,
   LaunchWorkspaceOptions,
   MenuAction,
+  SessionEndSettings,
+  SessionEndSettingsPatch,
   SessionState,
   WorkspaceOrderDirection,
   WorkspaceOverridePatch
@@ -31,8 +33,11 @@ const api: LauncherApi = {
     ipcRenderer.invoke('launcher:choose-directory') as Promise<string | null>,
   setLaunchAtLogin: (value: boolean) =>
     ipcRenderer.invoke('launcher:set-launch-at-login', value) as Promise<LauncherState>,
-  setOperatorMode: (value: boolean) =>
-    ipcRenderer.invoke('launcher:set-operator-mode', value) as Promise<LauncherState>,
+  setSessionEndSettings: (patch: SessionEndSettingsPatch) =>
+    ipcRenderer.invoke(
+      'launcher:set-session-end-settings',
+      patch
+    ) as Promise<SessionEndSettings>,
   setWorkspacePinned: (key: string, pinned: boolean) =>
     ipcRenderer.invoke('launcher:set-workspace-pinned', key, pinned) as Promise<LauncherState>,
   moveWorkspace: (key: string, direction: WorkspaceOrderDirection) =>
@@ -41,8 +46,8 @@ const api: LauncherApi = {
     ipcRenderer.invoke('launcher:clear-session') as Promise<SessionState>,
   reopenLastWorkspace: () =>
     ipcRenderer.invoke('launcher:reopen-last-workspace') as Promise<LaunchResult>,
-  requestLogout: () =>
-    ipcRenderer.invoke('launcher:request-logout') as Promise<void>,
+  requestSessionEnd: () =>
+    ipcRenderer.invoke('launcher:request-session-end') as Promise<boolean>,
   setEditMode: (value: boolean) =>
     ipcRenderer.invoke('launcher:set-edit-mode', value) as Promise<boolean>,
   onSessionState: (handler: (state: SessionState) => void) => {

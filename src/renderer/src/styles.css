@@ -173,13 +173,17 @@ button {
 
 /* ---------- Admin setup ---------- */
 .adminPanel {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
-  gap: 10px;
-  align-items: center;
   padding: 10px 16px;
   border-bottom: 1px solid var(--toolbar-border);
   background: #202124;
+}
+
+.adminPanelPrimary {
+  display: grid;
+  grid-template-columns: auto minmax(260px, 300px) auto;
+  gap: 0;
+  align-items: center;
+  justify-content: space-between;
 }
 
 .toggleRow {
@@ -203,27 +207,10 @@ button {
   opacity: 0.45;
 }
 
-.toggleRow span {
-  display: grid;
-  gap: 1px;
-  min-width: 0;
-}
-
-.toggleRow strong,
-.toggleRow small {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .toggleRow strong {
   font-size: 12px;
   font-weight: 650;
-}
-
-.toggleRow small {
-  color: var(--text-3);
-  font-size: 11px;
+  white-space: nowrap;
 }
 
 .adminActions {
@@ -256,6 +243,70 @@ button {
 .adminBtn:disabled {
   cursor: default;
   opacity: 0.55;
+}
+
+.endActionSetting {
+  min-height: 38px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.035);
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 7px;
+  align-items: center;
+  padding: 3px 4px 3px 9px;
+}
+
+.settingLabel {
+  color: var(--text-2);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.segmentedToggle {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid #383940;
+  border-radius: 7px;
+  background: #17181a;
+}
+
+.segmentedToggle button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-width: 0;
+  min-height: 26px;
+  padding: 4px 6px;
+  border: 0;
+  border-radius: 5px;
+  color: var(--text-3);
+  background: transparent;
+  font-size: 11px;
+  font-weight: 650;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color 120ms ease, background 120ms ease, box-shadow 120ms ease;
+}
+
+.segmentedToggle button:hover:not(:disabled):not(.selected) {
+  color: var(--text-2);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.segmentedToggle button.selected {
+  color: #ffffff;
+  background: var(--accent-strong);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.28);
+}
+
+.segmentedToggle button:disabled {
+  cursor: default;
+  opacity: 0.6;
 }
 
 /* ---------- Alerts area ---------- */
@@ -1219,6 +1270,20 @@ button {
   .adminBtn {
     flex: 1;
     justify-content: center;
+  }
+
+  .adminPanelPrimary {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .endActionSetting {
+    grid-row: 2;
+    grid-column: 1 / -1;
+  }
+
+  .adminActions {
+    grid-row: 1;
+    grid-column: 2;
   }
 
   .wsRow.editing {

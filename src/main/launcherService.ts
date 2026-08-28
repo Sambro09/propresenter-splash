@@ -1,21 +1,32 @@
-import { app, BrowserWindow, dialog, type OpenDialogOptions } from 'electron';
+import {
+  app,
+  BrowserWindow,
+  dialog,
+  shell as electronShell,
+  type MessageBoxOptions,
+  type OpenDialogOptions
+} from 'electron';
 import { stat } from 'node:fs/promises';
 import type {
   LauncherSettings,
   LauncherState,
   LaunchResult,
   LaunchWorkspaceOptions,
+  SessionEndSettings,
+  SessionEndSettingsPatch,
   WorkspaceOrderDirection,
   WorkspaceOverridePatch
 } from '../shared/types';
 import { writeActiveWorkspace } from './activeWorkspace';
 import {
   clearWorkspaceOverride,
-  getOperatorModeConfig,
+  getLaunchAtLoginSetupCompleteConfig,
+  getSessionEndSettingsConfig,
   getWorkspaceRootConfig,
   moveWorkspaceInOrderConfig,
   setCustomWorkspaceRoot,
-  setOperatorModeConfig,
+  setLaunchAtLoginSetupCompleteConfig,
+  setSessionEndSettingsConfig,
   setWorkspacePinnedConfig,
   setWorkspaceOverride
 } from './config';
@@ -31,6 +42,7 @@ import {
 } from './proPresenterController';
 import { runCommand } from './shell';
 import { getSessionState } from './sessionController';
+import { firstRunLoginItemAction } from './loginItemSetup';
 import {
   readWorkspaceDiscoveryCache,
   writeWorkspaceDiscoveryCache
@@ -40,6 +52,8 @@ type LauncherStateListener = (state: LauncherState) => void;
 
 const launcherStateListeners = new Set<LauncherStateListener>();
 let stateRefreshPromise: Promise<LauncherState> | undefined;
+const LOGIN_ITEMS_SETTINGS_URL =
+  'x-apple.systempreferences:com.apple.LoginItems-Settings.extension';
 
 function loginItemAvailable(): boolean {
   return process.platform === 'darwin';
@@ -51,19 +65,119 @@ function getLaunchAtLogin(): boolean {
   }
 
   try {
-    return app.getLoginItemSettings().openAtLogin;
+    return app.getLoginItemSettings({ type: 'mainAppService' }).openAtLogin;
   } catch (error) {
     void logError('Could not read Login Item settings', error);
     return false;
   }
 }
 
+async function showLoginItemMessage(
+  parentWindow: BrowserWindow | undefined,
+  options: MessageBoxOptions
+): Promise<Electron.MessageBoxReturnValue> {
+  return parentWindow
+    ? dialog.showMessageBox(parentWindow, options)
+    : dialog.showMessageBox(options);
+}
+
+/**
+ * Ask once before registering the app as a macOS login item.
+ *
+ * macOS 13+ can register the main app without an authentication sheet. When
+ * macOS reports `requires-approval`, direct the user to the system Login Items
+ * panel where that approval is controlled.
+ */
+export async function initializeLaunchAtLogin(
+  parentWindow?: BrowserWindow
+): Promise<boolean> {
+  if (!loginItemAvailable()) {
+    return false;
+  }
+
+  const setupComplete = await getLaunchAtLoginSetupCompleteConfig();
+  const current = app.getLoginItemSettings({ type: 'mainAppService' });
+  const action = firstRunLoginItemAction(setupComplete, current);
+  if (action === 'none') {
+    return false;
+  }
+  if (action === 'mark-complete') {
+    await setLaunchAtLoginSetupCompleteConfig(true);
+    return true;
+  }
+
+  const permission = await showLoginItemMessage(parentWindow, {
+    type: 'question',
+    title: 'Launch at Login',
+    message: 'Open ProPresenter Splash at login?',
+    detail:
+      'This puts workspace selection in front each time this Mac signs in. You can change it later in Edit Mode.',
+    buttons: ['Not Now', 'Allow'],
+    defaultId: 1,
+    cancelId: 0,
+    noLink: true
+  });
+
+  if (permission.response !== 1) {
+    await setLaunchAtLoginSetupCompleteConfig(true);
+    await logInfo('Launch at Login declined during first-run setup');
+    return true;
+  }
+
+  try {
+    app.setLoginItemSettings({
+      openAtLogin: true,
+      type: 'mainAppService'
+    });
+  } catch (error) {
+    await setLaunchAtLoginSetupCompleteConfig(true);
+    await logError('Could not enable Launch at Login during first-run setup', error);
+    await showLoginItemMessage(parentWindow, {
+      type: 'error',
+      title: 'Launch at Login',
+      message: 'Could not enable Launch at Login.',
+      detail: 'You can try again from Edit Mode.',
+      buttons: ['OK'],
+      defaultId: 0,
+      cancelId: 0,
+      noLink: true
+    });
+    return true;
+  }
+
+  await setLaunchAtLoginSetupCompleteConfig(true);
+  const registered = app.getLoginItemSettings({ type: 'mainAppService' });
+  await logInfo('Launch at Login enabled during first-run setup', {
+    status: registered.status
+  });
+
+  if (registered.status !== 'requires-approval') {
+    return true;
+  }
+
+  const approval = await showLoginItemMessage(parentWindow, {
+    type: 'info',
+    title: 'Launch at Login',
+    message: 'Approve Launch at Login in System Settings.',
+    detail: 'Open Login Items and enable ProPresenter Splash.',
+    buttons: ['Later', 'Open Login Items'],
+    defaultId: 1,
+    cancelId: 0,
+    noLink: true
+  });
+
+  if (approval.response === 1) {
+    await electronShell.openExternal(LOGIN_ITEMS_SETTINGS_URL);
+  }
+  return true;
+}
+
 async function getLauncherSettings(): Promise<LauncherSettings> {
-  const operatorMode = await getOperatorModeConfig();
+  const sessionEnd = await getSessionEndSettingsConfig();
   return {
     launchAtLogin: getLaunchAtLogin(),
     launchAtLoginAvailable: loginItemAvailable(),
-    operatorMode
+    sessionEnd
   };
 }
 
@@ -256,17 +370,19 @@ export async function setLaunchAtLogin(value: boolean): Promise<LauncherState> {
 
   app.setLoginItemSettings({
     openAtLogin: value,
-    openAsHidden: false
+    type: 'mainAppService'
   });
 
   await logInfo('Launcher Login Item setting changed', { openAtLogin: value });
   return getLauncherState();
 }
 
-export async function setOperatorMode(value: boolean): Promise<LauncherState> {
-  await setOperatorModeConfig(value);
-  await logInfo('Operator startup mode changed', { operatorMode: value });
-  return getLauncherState();
+export async function setSessionEndSettings(
+  patch: SessionEndSettingsPatch
+): Promise<SessionEndSettings> {
+  const settings = await setSessionEndSettingsConfig(patch);
+  await logInfo('Session-end settings changed', settings);
+  return settings;
 }
 
 export async function setWorkspacePinned(
@@ -297,28 +413,55 @@ export async function moveWorkspace(
   return getLauncherState();
 }
 
-export async function requestLogoutConfirmation(): Promise<void> {
+export async function requestSessionEndConfirmation(
+  parentWindow?: BrowserWindow
+): Promise<boolean> {
   if (process.platform !== 'darwin') {
-    throw new Error('Logout handoff is only available on macOS.');
+    throw new Error('Session-end handoff is only available on macOS.');
+  }
+
+  const { systemAction } = await getSessionEndSettingsConfig();
+  const actionLabel = systemAction === 'shutdown' ? 'shutdown' : 'logout';
+  const buttonLabel = systemAction === 'shutdown' ? 'Shut Down' : 'Log Out';
+  const confirmationOptions: MessageBoxOptions = {
+    type: 'warning',
+    title: `${buttonLabel} This Mac?`,
+    message: `${buttonLabel} this Mac?`,
+    detail:
+      'ProPresenter will close before the session ends. Make sure all presentation changes are saved.',
+    buttons: ['Cancel', buttonLabel],
+    defaultId: 0,
+    cancelId: 0,
+    noLink: true
+  };
+  const confirmation = parentWindow
+    ? await dialog.showMessageBox(parentWindow, confirmationOptions)
+    : await dialog.showMessageBox(confirmationOptions);
+
+  if (confirmation.response !== 1) {
+    await logInfo(`Canceled macOS ${actionLabel}`);
+    return false;
   }
 
   if (await isProPresenterRunning()) {
     try {
-      await logInfo('Closing ProPresenter before macOS logout');
+      await logInfo(`Closing ProPresenter before macOS ${actionLabel}`);
       await quitProPresenterAndWait();
     } catch (error) {
-      await logError('ProPresenter failed to close before macOS logout', error);
+      await logError(`ProPresenter failed to close before macOS ${actionLabel}`, error);
       const detail = error instanceof Error ? error.message : String(error);
       throw new Error(
-        `ProPresenter did not close, so macOS logout was not requested. ${detail}`
+        `ProPresenter did not close, so macOS ${actionLabel} was not requested. ${detail}`
       );
     }
   }
 
-  await logInfo('Requesting macOS logout confirmation');
-  await runCommand('osascript', ['-e', 'tell application "System Events" to log out'], {
+  await logInfo(`Requesting macOS ${actionLabel} confirmation`);
+  const command = systemAction === 'shutdown' ? 'shut down' : 'log out';
+  await runCommand('osascript', ['-e', `tell application "System Events" to ${command}`], {
     timeout: 8_000
   });
+  return true;
 }
 
 export async function launchWorkspace(

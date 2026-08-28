@@ -14,6 +14,7 @@ import {
   Info,
   MonitorPlay,
   PencilSimple,
+  Power,
   PushPin,
   SignOut,
   Stack,
@@ -23,6 +24,8 @@ import {
 import type {
   LauncherState,
   LaunchWorkspaceOptions,
+  SessionEndSettings,
+  SessionEndSettingsPatch,
   SessionState,
   Workspace,
   WorkspaceOrderDirection,
@@ -34,6 +37,7 @@ type LaunchingState = {
   workspaceId: string;
   label: string;
 };
+type SessionEndSettingKey = keyof SessionEndSettings;
 
 // Phosphor regular weight everywhere, matching ProPresenter's line-weight UI chrome.
 const ICON_DEFAULTS = { weight: 'regular' as const, size: 18 };
@@ -48,9 +52,9 @@ function App(): JSX.Element {
   const [confirmingWorkspace, setConfirmingWorkspace] = useState<Workspace | null>(null);
   const [retryWorkspace, setRetryWorkspace] = useState<Workspace | null>(null);
   const [sessionState, setSessionState] = useState<SessionState>({ status: 'idle' });
-  const [sessionAction, setSessionAction] = useState<
-    'logout' | 'choose' | 'reopen' | null
-  >(null);
+  const [sessionAction, setSessionAction] = useState<'system' | 'choose' | 'reopen' | null>(null);
+  const [savingSessionEndSetting, setSavingSessionEndSetting] =
+    useState<SessionEndSettingKey | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [copyStatus, setCopyStatus] = useState<string | null>(null);
@@ -248,17 +252,36 @@ function App(): JSX.Element {
     }
   }
 
-  async function handleSetOperatorMode(value: boolean): Promise<void> {
+  async function handleSetSessionEndSettings(
+    patch: SessionEndSettingsPatch
+  ): Promise<void> {
+    const setting = Object.keys(patch)[0] as SessionEndSettingKey | undefined;
+    if (!setting) {
+      return;
+    }
+
+    setSavingSessionEndSetting(setting);
     setMessage(null);
     setNotice(null);
     setCopyStatus(null);
     try {
-      const nextState = await window.launcher.setOperatorMode(value);
-      setLauncherState(nextState);
-      setSessionState(nextState.session);
+      const sessionEnd = await window.launcher.setSessionEndSettings(patch);
+      setLauncherState((current) =>
+        current
+          ? {
+              ...current,
+              settings: {
+                ...current.settings,
+                sessionEnd
+              }
+            }
+          : current
+      );
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error);
-      setMessage(`Could not change operator startup mode. ${detail}`);
+      setMessage(`Could not change the end-screen settings. ${detail}`);
+    } finally {
+      setSavingSessionEndSetting(null);
     }
   }
 
@@ -336,17 +359,21 @@ function App(): JSX.Element {
     }
   }
 
-  async function handleRequestLogout(): Promise<void> {
-    setSessionAction('logout');
+  async function handleRequestSessionEnd(): Promise<void> {
+    const systemAction = launcherState?.settings.sessionEnd.systemAction ?? 'logout';
+    const actionLabel = systemAction === 'shutdown' ? 'shutdown' : 'logout';
+    setSessionAction('system');
     setMessage(null);
     setNotice(null);
     setCopyStatus(null);
     try {
-      await window.launcher.requestLogout();
-      setNotice('macOS logout confirmation opened.');
+      const requested = await window.launcher.requestSessionEnd();
+      if (requested) {
+        setNotice(`macOS ${actionLabel} requested.`);
+      }
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error);
-      setMessage(`Could not open the macOS logout confirmation. ${detail}`);
+      setMessage(`Could not open the macOS ${actionLabel} confirmation. ${detail}`);
     } finally {
       setSessionAction(null);
     }
@@ -431,7 +458,7 @@ function App(): JSX.Element {
               <PencilSimple size={15} weight="fill" />
               Edit Mode
             </span>
-            <span className="editBarHint">Rename or repoint workspaces</span>
+            <span className="editBarHint">Configure this Mac and its workspaces</span>
             <button className="editBarDone" type="button" onClick={() => void handleExitEditMode()}>
               Exit
             </button>
@@ -442,8 +469,9 @@ function App(): JSX.Element {
           <AdminPanel
             launcherState={launcherState}
             refreshing={refreshing}
+            savingSessionEndSetting={savingSessionEndSetting}
             onSetLaunchAtLogin={handleSetLaunchAtLogin}
-            onSetOperatorMode={handleSetOperatorMode}
+            onSetSessionEndSettings={handleSetSessionEndSettings}
             onRefresh={handleRefresh}
             onChooseFolder={handleChooseFolder}
           />
@@ -527,8 +555,9 @@ function App(): JSX.Element {
           {loadStatus === 'ready' && launcherState && showSessionEnded ? (
             <SessionEndedScreen
               session={sessionState}
+              settings={launcherState.settings.sessionEnd}
               busyAction={sessionAction}
-              onLogout={handleRequestLogout}
+              onSystemAction={handleRequestSessionEnd}
               onChooseAnother={handleChooseAnotherWorkspace}
               onReopenLast={handleReopenLastWorkspace}
             />
@@ -573,59 +602,77 @@ function App(): JSX.Element {
 function AdminPanel({
   launcherState,
   refreshing,
+  savingSessionEndSetting,
   onSetLaunchAtLogin,
-  onSetOperatorMode,
+  onSetSessionEndSettings,
   onRefresh,
   onChooseFolder
 }: {
   launcherState: LauncherState;
   refreshing: boolean;
+  savingSessionEndSetting: SessionEndSettingKey | null;
   onSetLaunchAtLogin: (value: boolean) => Promise<void>;
-  onSetOperatorMode: (value: boolean) => Promise<void>;
+  onSetSessionEndSettings: (patch: SessionEndSettingsPatch) => Promise<void>;
   onRefresh: () => Promise<void>;
   onChooseFolder: () => Promise<void>;
 }): JSX.Element {
+  const sessionEnd = launcherState.settings.sessionEnd;
+  const endSettingsBusy = savingSessionEndSetting !== null;
+
   return (
     <section className="adminPanel" aria-label="Admin setup">
-      <label className="toggleRow">
-        <input
-          type="checkbox"
-          checked={launcherState.settings.launchAtLogin}
-          disabled={!launcherState.settings.launchAtLoginAvailable}
-          onChange={(event) => void onSetLaunchAtLogin(event.currentTarget.checked)}
-        />
-        <span>
+      <div className="adminPanelPrimary">
+        <label className="toggleRow">
+          <input
+            type="checkbox"
+            checked={launcherState.settings.launchAtLogin}
+            disabled={!launcherState.settings.launchAtLoginAvailable}
+            onChange={(event) => void onSetLaunchAtLogin(event.currentTarget.checked)}
+          />
           <strong>Launch at login</strong>
-          <small>Register this launcher as the shared account Login Item.</small>
-        </span>
-      </label>
+        </label>
 
-      <label className="toggleRow">
-        <input
-          type="checkbox"
-          checked={launcherState.settings.operatorMode}
-          onChange={(event) => void onSetOperatorMode(event.currentTarget.checked)}
-        />
-        <span>
-          <strong>Focused startup mode</strong>
-          <small>Open centered and focused when the operator logs in.</small>
-        </span>
-      </label>
+        <div className="endActionSetting">
+          <span className="settingLabel">End screen</span>
+          <div className="segmentedToggle" role="group" aria-label="End-screen action">
+            <button
+              type="button"
+              className={sessionEnd.systemAction === 'logout' ? 'selected' : undefined}
+              aria-pressed={sessionEnd.systemAction === 'logout'}
+              disabled={endSettingsBusy}
+              onClick={() => void onSetSessionEndSettings({ systemAction: 'logout' })}
+            >
+              <SignOut size={14} />
+              Log Out
+            </button>
+            <button
+              type="button"
+              className={sessionEnd.systemAction === 'shutdown' ? 'selected' : undefined}
+              aria-pressed={sessionEnd.systemAction === 'shutdown'}
+              disabled={endSettingsBusy}
+              onClick={() => void onSetSessionEndSettings({ systemAction: 'shutdown' })}
+            >
+              <Power size={14} />
+              Shut Down
+            </button>
+          </div>
+        </div>
 
-      <div className="adminActions">
-        <button
-          className="adminBtn"
-          type="button"
-          onClick={() => void onRefresh()}
-          disabled={refreshing}
-        >
-          {refreshing ? <CircleNotch size={15} className="spin" /> : <Stack size={15} />}
-          Rescan
-        </button>
-        <button className="adminBtn" type="button" onClick={() => void onChooseFolder()}>
-          <FolderOpen size={15} />
-          Choose Folder
-        </button>
+        <div className="adminActions">
+          <button
+            className="adminBtn"
+            type="button"
+            onClick={() => void onRefresh()}
+            disabled={refreshing}
+          >
+            {refreshing ? <CircleNotch size={15} className="spin" /> : <Stack size={15} />}
+            Rescan
+          </button>
+          <button className="adminBtn" type="button" onClick={() => void onChooseFolder()}>
+            <FolderOpen size={15} />
+            Folder
+          </button>
+        </div>
       </div>
     </section>
   );
@@ -633,18 +680,21 @@ function AdminPanel({
 
 function SessionEndedScreen({
   session,
+  settings,
   busyAction,
-  onLogout,
+  onSystemAction,
   onChooseAnother,
   onReopenLast
 }: {
   session: SessionState;
-  busyAction: 'logout' | 'choose' | 'reopen' | null;
-  onLogout: () => Promise<void>;
+  settings: SessionEndSettings;
+  busyAction: 'system' | 'choose' | 'reopen' | null;
+  onSystemAction: () => Promise<void>;
   onChooseAnother: () => Promise<void>;
   onReopenLast: () => Promise<void>;
 }): JSX.Element {
   const workspaceName = session.lastWorkspaceName ?? 'Last Workspace';
+  const willShutDown = settings.systemAction === 'shutdown';
 
   return (
     <section className="sessionScreen">
@@ -653,37 +703,23 @@ function SessionEndedScreen({
       </div>
       <h2>Session Finished</h2>
       <p>{workspaceName}</p>
-      <p className="sessionHint">
-        Use these buttons, or the ProPresenter Splash menu-bar icon, to log out, switch, or
-        reopen.
-      </p>
+      <p className="sessionHint">Choose what happens next on this shared Mac.</p>
 
       <div className="sessionActions">
         <button
           className="sessionBtn primary"
           type="button"
-          onClick={() => void onLogout()}
+          onClick={() => void onSystemAction()}
           disabled={Boolean(busyAction)}
         >
-          {busyAction === 'logout' ? (
+          {busyAction === 'system' ? (
             <CircleNotch size={18} className="spin" />
+          ) : willShutDown ? (
+            <Power size={18} />
           ) : (
             <SignOut size={18} />
           )}
-          Log Out
-        </button>
-        <button
-          className="sessionBtn"
-          type="button"
-          onClick={() => void onChooseAnother()}
-          disabled={Boolean(busyAction)}
-        >
-          {busyAction === 'choose' ? (
-            <CircleNotch size={18} className="spin" />
-          ) : (
-            <Stack size={18} />
-          )}
-          Choose Another Workspace
+          {willShutDown ? 'Shut Down' : 'Log Out'}
         </button>
         <button
           className="sessionBtn"
@@ -696,7 +732,20 @@ function SessionEndedScreen({
           ) : (
             <MonitorPlay size={18} />
           )}
-          Reopen Last Workspace
+          Open Most Recent Workspace
+        </button>
+        <button
+          className="sessionBtn"
+          type="button"
+          onClick={() => void onChooseAnother()}
+          disabled={Boolean(busyAction)}
+        >
+          {busyAction === 'choose' ? (
+            <CircleNotch size={18} className="spin" />
+          ) : (
+            <Stack size={18} />
+          )}
+          Choose Other Workspace
         </button>
       </div>
     </section>
@@ -1054,7 +1103,7 @@ function buildSupportDetails(state: LauncherState | null, message: string | null
     `ProPresenter path: ${state?.proPresenter.appPath ?? 'unknown'}`,
     `ProPresenter window: ${state?.session.proPresenterWindow ?? 'unknown'}`,
     `Launch at login: ${state?.settings.launchAtLogin ? 'yes' : 'no'}`,
-    `Operator mode: ${state?.settings.operatorMode ? 'yes' : 'no'}`,
+    `Session-end action: ${state?.settings.sessionEnd.systemAction ?? 'unknown'}`,
     `Session: ${state?.session.status ?? 'unknown'}`,
     `Support log: ${state?.supportLogPath ?? 'unknown'}`,
     '',

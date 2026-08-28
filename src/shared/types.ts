@@ -17,10 +17,18 @@ export interface WorkspaceOverridePatch {
   path?: string;
 }
 
+export type SessionEndSystemAction = 'logout' | 'shutdown';
+
+export interface SessionEndSettings {
+  systemAction: SessionEndSystemAction;
+}
+
+export type SessionEndSettingsPatch = Partial<SessionEndSettings>;
+
 export interface LauncherSettings {
   launchAtLogin: boolean;
   launchAtLoginAvailable: boolean;
-  operatorMode: boolean;
+  sessionEnd: SessionEndSettings;
 }
 
 export type ProPresenterWindowState = 'foreground' | 'background' | 'minimized' | 'unknown';
@@ -98,8 +106,8 @@ export interface LauncherApi {
   chooseDirectory: () => Promise<string | null>;
   /** Enable or disable macOS Login Item registration for this launcher. */
   setLaunchAtLogin: (value: boolean) => Promise<LauncherState>;
-  /** Enable or disable focused operator startup mode. */
-  setOperatorMode: (value: boolean) => Promise<LauncherState>;
+  /** Update the buttons shown after a ProPresenter session ends. */
+  setSessionEndSettings: (patch: SessionEndSettingsPatch) => Promise<SessionEndSettings>;
   /** Pin/unpin a workspace and persist the display order. */
   setWorkspacePinned: (key: string, pinned: boolean) => Promise<LauncherState>;
   /** Move a workspace within the admin-defined order. */
@@ -108,8 +116,8 @@ export interface LauncherApi {
   clearSession: () => Promise<SessionState>;
   /** Reopen the most recent ProPresenter workspace from the end-of-session screen. */
   reopenLastWorkspace: () => Promise<LaunchResult>;
-  /** Ask macOS to show the standard logout confirmation. */
-  requestLogout: () => Promise<void>;
+  /** Ask macOS to confirm the configured logout or shutdown action. */
+  requestSessionEnd: () => Promise<boolean>;
   /** Set edit/admin mode; keeps the native menu checkbox in sync. */
   setEditMode: (value: boolean) => Promise<boolean>;
   /** Subscribe to ProPresenter session state changes. Returns an unsubscribe fn. */
