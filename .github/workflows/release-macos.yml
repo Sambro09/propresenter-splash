@@ -118,7 +118,6 @@ jobs:
           path: |
             dist/*.dmg
             dist/*.zip
-            dist/*.blockmap
             dist/latest-mac.yml
 
       - name: Create draft GitHub release
@@ -126,7 +125,7 @@ jobs:
         shell: bash
         run: |
           shopt -s nullglob
-          ARTIFACTS=(dist/*.dmg dist/*.zip dist/*.blockmap dist/latest-mac.yml)
+          ARTIFACTS=(dist/*.dmg dist/*.zip dist/latest-mac.yml)
 
           if gh release view "$RELEASE_TAG" --json isDraft --jq '.isDraft' > "$RUNNER_TEMP/release-draft" 2>/dev/null; then
             test "$(cat "$RUNNER_TEMP/release-draft")" = "true"

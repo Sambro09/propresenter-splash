@@ -115,7 +115,7 @@ jobs:
           xcrun stapler validate "${{ steps.app.outputs.app_path }}"
           spctl -a -vvv --type execute "${{ steps.app.outputs.app_path }}"
 
-      - name: Build update ZIP, blockmap, and manifest
+      - name: Build update ZIP and manifest
         id: update
         shell: bash
         env:
@@ -126,23 +126,35 @@ jobs:
           ZIP_PATH="$FINAL_DIR/$ZIP_NAME"
           mkdir -p "$FINAL_DIR"
           ditto -c -k --sequesterRsrc --keepParent "${{ steps.app.outputs.app_path }}" "$ZIP_PATH"
-          node - "$ZIP_PATH" "$ZIP_PATH.blockmap" "$FINAL_DIR/latest-mac.yml" "$VERSION" <<'NODE'
-          const { writeFile } = require('node:fs/promises');
+          node - "$ZIP_PATH" "$FINAL_DIR/latest-mac.yml" "$VERSION" <<'NODE'
+          const { createHash } = require('node:crypto');
+          const { createReadStream } = require('node:fs');
+          const { stat, writeFile } = require('node:fs/promises');
           const { basename } = require('node:path');
-          const { buildBlockMap } = require('app-builder-lib/out/targets/blockmap/blockmap.js');
+
+          function hashFile(path) {
+            return new Promise((resolve, reject) => {
+              const hash = createHash('sha512');
+              const input = createReadStream(path);
+              input.on('data', (chunk) => hash.update(chunk));
+              input.on('error', reject);
+              input.on('end', () => resolve(hash.digest('base64')));
+            });
+          }
 
           async function main() {
-            const [zipPath, blockmapPath, manifestPath, version] = process.argv.slice(2);
-            const info = await buildBlockMap(zipPath, 'gzip', blockmapPath);
+            const [zipPath, manifestPath, version] = process.argv.slice(2);
+            const sha512 = await hashFile(zipPath);
+            const { size } = await stat(zipPath);
             const zipName = basename(zipPath);
             const manifest = [
               `version: ${version}`,
               'files:',
               `  - url: ${zipName}`,
-              `    sha512: ${info.sha512}`,
-              `    size: ${info.size}`,
+              `    sha512: ${sha512}`,
+              `    size: ${size}`,
               `path: ${zipName}`,
-              `sha512: ${info.sha512}`,
+              `sha512: ${sha512}`,
               `releaseDate: '${new Date().toISOString()}'`,
               ''
             ].join('\n');
@@ -155,7 +167,6 @@ jobs:
           });
           NODE
           test -s "$ZIP_PATH"
-          test -s "$ZIP_PATH.blockmap"
           test -s "$FINAL_DIR/latest-mac.yml"
           echo "final_dir=$FINAL_DIR" >> "$GITHUB_OUTPUT"
           echo "zip_path=$ZIP_PATH" >> "$GITHUB_OUTPUT"
@@ -189,7 +200,6 @@ jobs:
           grep -Fx "version: $VERSION" "$FINAL_DIR/latest-mac.yml"
           grep -Fx "path: ProPresenter-Splash-${VERSION}-universal.zip" "$FINAL_DIR/latest-mac.yml"
           grep -Eq '^sha512: .+' "$FINAL_DIR/latest-mac.yml"
-          test -s "${{ steps.update.outputs.zip_path }}.blockmap"
           test -s "${{ steps.dmg.outputs.dmg_path }}"
 
       - name: Upload workflow artifacts
@@ -200,7 +210,6 @@ jobs:
           path: |
             ${{ steps.dmg.outputs.dmg_path }}
             ${{ steps.update.outputs.zip_path }}
-            ${{ steps.update.outputs.zip_path }}.blockmap
             ${{ steps.update.outputs.final_dir }}/latest-mac.yml
 
       - name: Replace draft assets and publish release
@@ -210,7 +219,6 @@ jobs:
           gh release upload "$RELEASE_TAG" \
             "${{ steps.dmg.outputs.dmg_path }}" \
             "${{ steps.update.outputs.zip_path }}" \
-            "${{ steps.update.outputs.zip_path }}.blockmap" \
             "$FINAL_DIR/latest-mac.yml" \
             --clobber
           gh release delete-asset "$RELEASE_TAG" "$PRESIGNED_ASSET" --yes

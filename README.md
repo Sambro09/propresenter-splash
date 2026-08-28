@@ -17,7 +17,7 @@ Download signed builds from [GitHub Releases](https://github.com/Sambro09/propre
 
 Packaged builds check the public GitHub release feed after startup and every six hours. The app
 downloads a newer signed release in the background and installs it when ProPresenter Splash quits.
-The release must include `latest-mac.yml`, the macOS ZIP, and its blockmap.
+The release must include `latest-mac.yml` and the macOS ZIP. The DMG provides the manual download.
 
 The first public release creates the update feed. To test a new release, install the previous
 signed version, publish the new version, open the old version, and confirm the update in the local
