@@ -49,10 +49,10 @@ manifest, and publishes a GitHub release only after those checks pass.
 
 If exporting the Developer ID identity is not possible, the **Finalize pre-signed macOS release**
 workflow supports a key-local fallback. Build and sign the universal app on the release Mac,
-attach its ZIP to a draft release, and dispatch the workflow with the tag and asset name. GitHub
-uses the Apple API key only to notarize the signed app and DMG; the Developer ID private key never
-leaves the Mac. The workflow publishes only after it verifies the signature, team, architectures,
-notarization tickets, and update feed.
+attach its ZIP and signed DMG to a draft release, and dispatch the workflow with the tag and asset
+names. GitHub uses the Apple API key only to notarize the signed app and DMG; the Developer ID
+private key never leaves the Mac. The workflow publishes only after it verifies the signature,
+team, architectures, notarization tickets, and update feed.
 
 Repository administrators must configure these GitHub Actions secrets:
 
