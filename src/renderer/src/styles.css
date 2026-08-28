@@ -580,6 +580,278 @@ button {
   line-height: 1.45;
 }
 
+/* ---------- Scanning state ---------- */
+/*
+ * Four decorative layers over the shipped app icon, all on one seamless loop:
+ *   1. the tile floats a few pixels,
+ *   2. a soft blue light sweeps across it (masked to the icon's own silhouette),
+ *   3. three thin ripple rings expand beneath it, evenly staggered,
+ *   4. one droplet falls and lands exactly as the next ring is born.
+ * Only transform + opacity animate, and every box is a fixed size, so the
+ * block never reflows and stays cheap enough to run for a whole long scan.
+ */
+.splashScan {
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 0;
+  height: 100%;
+  padding: 28px 24px;
+  text-align: center;
+  --splash-loop: 2.8s;
+  --splash-logo: 112px;
+}
+
+.splashStage {
+  position: relative;
+  width: 176px;
+  height: 160px;
+}
+
+/* Layer 1 — the icon itself, floating. */
+.splashLogo {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: var(--splash-logo);
+  height: var(--splash-logo);
+  margin-left: calc(var(--splash-logo) / -2);
+  background: url("../../../build/icon.png") center / contain no-repeat;
+  /* Contain the sweep's blend so it lightens the tile and nothing behind it. */
+  isolation: isolate;
+  will-change: transform;
+  animation: splashFloat var(--splash-loop) ease-in-out infinite;
+}
+
+/* Layer 2 — light sweep, clipped to the icon's alpha so it never spills past
+   the rounded square. The mask is the same file, so it costs no extra decode. */
+.splashSweep {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  mix-blend-mode: plus-lighter;
+  -webkit-mask: url("../../../build/icon.png") center / contain no-repeat;
+  mask: url("../../../build/icon.png") center / contain no-repeat;
+}
+
+.splashSweep::before {
+  content: "";
+  position: absolute;
+  top: -25%;
+  bottom: -25%;
+  left: 0;
+  width: 55%;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(174, 208, 255, 0.16) 42%,
+    rgba(228, 240, 255, 0.26) 55%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  will-change: transform;
+  animation: splashSweep var(--splash-loop) linear infinite;
+}
+
+/* Layer 3 — ripple rings, one third of the loop apart. */
+.splashRipples {
+  position: absolute;
+  left: 50%;
+  bottom: 6px;
+  width: 176px;
+  height: 44px;
+  margin-left: -88px;
+}
+
+.splashRing {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 156px;
+  height: 34px;
+  margin: -17px 0 0 -78px;
+  /* 1.5px base: scale() shrinks the stroke too, so this lands near 1px across
+     the stretch of the ripple that is actually visible. */
+  border: 1.5px solid rgba(126, 178, 255, 0.95);
+  border-radius: 50%;
+  opacity: 0;
+  will-change: transform, opacity;
+  animation: splashRipple var(--splash-loop) linear infinite;
+}
+
+/* Negative delays start each ring mid-flight, so the first frame is already
+   a full ripple instead of an empty pool. */
+.splashRing:nth-child(2) {
+  animation-delay: calc(var(--splash-loop) / -3);
+}
+
+.splashRing:nth-child(3) {
+  animation-delay: calc(var(--splash-loop) / -1.5);
+}
+
+/* Layer 4 — the droplet, landing on the loop boundary where a ring is born. */
+.splashDrop {
+  position: absolute;
+  top: 66px;
+  left: 50%;
+  width: 4px;
+  height: 6px;
+  margin-left: -14px;
+  border-radius: 50% 50% 54% 54%;
+  background: linear-gradient(
+    180deg,
+    rgba(236, 244, 255, 0.95),
+    rgba(126, 176, 255, 0.7)
+  );
+  opacity: 0;
+  will-change: transform, opacity;
+  animation: splashDrop var(--splash-loop) linear infinite;
+}
+
+.splashTitle {
+  margin: 20px 0 0;
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+/* Fixed-width dots: only opacity moves, so the heading never re-measures. */
+.splashDots i {
+  font-style: normal;
+  opacity: 0.45;
+  animation: splashDot var(--splash-loop) ease-in-out infinite;
+}
+
+.splashDots i:nth-child(2) {
+  animation-delay: calc(var(--splash-loop) / -1.5);
+}
+
+.splashDots i:nth-child(3) {
+  animation-delay: calc(var(--splash-loop) / -3);
+}
+
+.splashHint {
+  max-width: 260px;
+  margin: 7px 0 0;
+  color: var(--text-2);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+@keyframes splashFloat {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+  50% {
+    transform: translate3d(0, -5px, 0);
+  }
+}
+
+@keyframes splashSweep {
+  0% {
+    transform: translate3d(-190%, 0, 0) skewX(-14deg);
+    opacity: 0;
+  }
+  9% {
+    opacity: 1;
+  }
+  37% {
+    opacity: 1;
+  }
+  46%,
+  100% {
+    transform: translate3d(190%, 0, 0) skewX(-14deg);
+    opacity: 0;
+  }
+}
+
+/* Scale is hand-stepped rather than eased so the ring decelerates smoothly
+   across every keyframe segment instead of pulsing at each one. */
+@keyframes splashRipple {
+  0% {
+    transform: scale(0.24);
+    opacity: 0;
+  }
+  10% {
+    transform: scale(0.4);
+    opacity: 0.55;
+  }
+  40% {
+    transform: scale(0.7);
+    opacity: 0.36;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 0;
+  }
+}
+
+@keyframes splashDrop {
+  0%,
+  56% {
+    transform: translate3d(0, 0, 0);
+    opacity: 0;
+  }
+  62% {
+    transform: translate3d(0, 5px, 0);
+    opacity: 0.85;
+  }
+  78% {
+    transform: translate3d(0, 24px, 0);
+    opacity: 0.9;
+  }
+  92% {
+    transform: translate3d(0, 48px, 0);
+    opacity: 0.7;
+  }
+  100% {
+    transform: translate3d(0, 66px, 0);
+    opacity: 0;
+  }
+}
+
+@keyframes splashDot {
+  0%,
+  46%,
+  100% {
+    opacity: 0.45;
+  }
+  16% {
+    opacity: 1;
+  }
+}
+
+/* Reduce Motion: a still icon over one soft accent ring. Same boxes, same
+   metrics, so switching the system setting does not move anything. */
+@media (prefers-reduced-motion: reduce) {
+  .splashLogo,
+  .splashSweep::before,
+  .splashDrop,
+  .splashRing,
+  .splashDots i {
+    animation: none;
+  }
+
+  .splashSweep,
+  .splashDrop {
+    display: none;
+  }
+
+  .splashRing {
+    opacity: 0;
+  }
+
+  .splashRing:first-child {
+    transform: scale(0.8);
+    opacity: 0.36;
+  }
+
+  .splashDots i {
+    opacity: 0.62;
+  }
+}
+
 .primaryBtn {
   display: inline-flex;
   align-items: center;
